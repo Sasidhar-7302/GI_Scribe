@@ -114,9 +114,15 @@ class AppConfig:
 
     @classmethod
     def load(cls, path: Path = CONFIG_FILE) -> "AppConfig":
+        import logging
+        logger = logging.getLogger("medrec.config")
         if not path.exists():
             return cls()
-        data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse config.json: {e}. Falling back to defaults.")
+            return cls()
         return cls.from_dict(data)
 
     def save(self, path: Path = CONFIG_FILE) -> None:

@@ -1,83 +1,70 @@
 # GI Scribe
 
-**Local-first AI Medical Scribe.**
-GI Scribe listens to patient encounters, transcribes audio (Whisper), polishes the transcript (Llama 3), and generates structured clinical notes (Llama 3). All data remains 100% offline.
+**A Professional, Local-First AI Medical Scribe for Gastroenterology.**
 
-## 🚀 Key Features
+GI Scribe listens to patient encounters, transcribes audio with high fidelity, polishes the transcript for medical accuracy, and generates structured clinical notes (HPI, Assessment, Plan). Designed specifically for Gastroenterology, it prioritizes patient privacy by running **100% offline**.
 
-*   **Three-Stage Pipeline:**
-    1.  **Transcribe:** OpenAI Whisper (`large-v3`) for high-accuracy speech-to-text.
-    2.  **Polish:** Llama 3 for verbatim correction (fixes "womiting" -> "vomiting" while preserving natural speech).
-    3.  **Summarize:** Llama 3 for extraction of HPI, Assessment, and Plan.
-*   **Zero-Hallucination:** Strict safeguards ensure "Not Documented" is returned if info is missing.
-*   **Privacy First:** No cloud APIs. No data leaves your machine.
+## ✨ Key Features
+
+*   **Three-Stage Intelligence Pipeline:**
+    1.  **Transcribe:** Utilizes OpenAI Whisper (`large-v3`, C++ optimized) for high-accuracy speech-to-text.
+    2.  **Polish:** Refines transcripts using MedLlama3 to ensure verbatim correction while preserving crucial conversational context.
+    3.  **Summarize:** Generates clinical notes directly from polished text, strictly adhering to medical structures.
+*   **Zero-Hallucination Framework:** Strict safeguards ensure the AI explicitly denotes "Not Documented" for missing information, preventing dangerous fabricated clinical data.
+*   **Complete Privacy:** No cloud APIs. No data leaves your machine. HIPAA-compliant by design.
+*   **Modern UI:** A beautiful, responsive PySide6 interface optimized for high-speed clinical workflows.
 
 ## 📂 Project Structure
 
-*   `app/`: Core application logic (UI, Engines).
-*   `data/`: Validation datasets (`GiAudiotest`, `GiTestValid`).
+*   `app/`: Core application logic.
+    *   `ui/`: Modular UI framework (`main_window.py`, `components.py`, `styles.py`).
+    *   *Backend engines* (`transcriber.py`, `summarizer.py`, `storage.py`).
+*   `data/`: Validation and testing datasets.
 *   `models/`: Binary model files (GGML/GGUF).
-*   `scripts/`: Utility scripts for benchmarking and maintenance.
-*   `tests/`: Human-readable test scripts.
-*   `docs/`: Architecture and User Guides.
-*   `ARCHITECTURE.md`: Technical deep dive into the pipeline.
+*   `scripts/`: Utility scripts for benchmarking, data generation, and maintenance.
 
-## 🛠️ Setup
+## 🛠️ Installation & Setup
 
 ### 1. Python Environment
+Requires Python 3.11+.
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Whisper (C++ Backend)
+### 2. Whisper Backend (C++)
+The engine uses heavily optimized C++ bindings for inference speed.
 ```powershell
 git clone https://github.com/ggerganov/whisper.cpp external\whisper.cpp
 cd external\whisper.cpp
 cmake -B build -DBUILD_SHARED_LIBS=OFF
 cmake --build build --config Release
 ```
-Download `ggml-large-v3.bin` into `models\whisper`.
+Place `ggml-large-v3.bin` into `models\whisper`.
 
-### 3. Llama 3 (Ollama)
-Install [Ollama](https://ollama.com/) and pull the model:
+### 3. Ollama Integration
+Install [Ollama](https://ollama.com/) and fetch the Llama3 backbone:
 ```powershell
 ollama pull llama3
 ```
-Ensure `ollama serve` is running.
+Ensure the background service `ollama serve` is running.
 
 ### 4. Configuration
-Copy `config.example.json` to `config.json`. Ensure `model` is set to `llama3`.
+Duplicate `config.example.json` and rename it to `config.json`. Update paths as necessary to match your environment.
 
-## 🔄 Restore from Git (Easy Use)
+## ▶️ Usage
 
-If you clone this repository on a new machine, follow these steps to get back to "90% Accuracy" mode:
-
-1.  **Environment:** `pip install -r requirements.txt`
-2.  **Ollama (LLM):** 
-    *   Install [Ollama](https://ollama.com).
-    *   `ollama pull llama3` (Matches the modern configuration).
-3.  **Whisper (ASR):**
-    *   Re-build the C++ backend (see **Setup** above).
-    *   Download `ggml-large-v3.bin` into `models/whisper/`.
-4.  **Config:** Ensure your `config.json` points to the new local paths.
-
-**Done!** You are now ready to run `python main.py`.
-
-
-## 🧪 Verification
-
-Run the full end-to-end pipeline test:
-```powershell
-python scripts/validate_full_pipeline.py
-```
-This will transcribe, polish, and summarize the sample files in `data/GiAudiotest`.
-
-## ▶️ Running the App
+To launch the GI Scribe interface:
 ```powershell
 python main.py
 ```
 
+## 🧪 Verification & Benchmarking
+Run the full end-to-end pipeline test to validate accuracy on your hardware:
+```powershell
+python scripts/validate_full_pipeline.py
+```
+
 ## 📄 Documentation
-See [ARCHITECTURE.md](ARCHITECTURE.md) for system design details.
+For detailed system design and flow state, review [ARCHITECTURE.md](ARCHITECTURE.md).
