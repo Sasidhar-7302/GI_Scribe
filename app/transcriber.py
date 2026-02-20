@@ -212,6 +212,7 @@ class WhisperTranscriber:
         self._faster_model = WhisperModel(
             model_source,
             device=device,
+            device_index=getattr(self.config, "device_index", 0),
             compute_type=compute,
             download_root=str(download_root),
         )
@@ -224,8 +225,8 @@ class WhisperTranscriber:
         segments_iter, info = model.transcribe(
             str(audio_path),
             language=self.config.language,
-            temperature=self.config.temperature or 0.0,
-            beam_size=self.config.beam_size,
+            temperature=[0.0, 0.2, 0.4, 0.6] if self.config.temperature in (0.0, None) else self.config.temperature,
+            beam_size=self.config.beam_size or 5,
             vad_filter=False,  # Disable VAD to avoid removing all audio
             initial_prompt=prompt_hint or None,
         )

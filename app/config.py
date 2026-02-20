@@ -44,6 +44,7 @@ class WhisperConfig:
     translate: bool = False
     extra_args: List[str] = field(default_factory=lambda: ["--print-progress"])
     diarization: DiarizationConfig = field(default_factory=DiarizationConfig)
+    device_index: int = 0
 
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> "WhisperConfig":

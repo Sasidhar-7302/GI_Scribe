@@ -178,7 +178,7 @@ class TwoPassSummarizer:
             gi_hints=self.gi_hints,
             transcript=diarized_transcript.strip()
         )
-        extracted = self._invoke_model(extraction_prompt, temperature=0.1)
+        extracted = self._invoke_model(extraction_prompt, temperature=0.05)
         self.logger.info(f"--- EXTRACTED TEXT PREVIEW ---\n{extracted[:500]}...\n-------------------------------")
 
         # Stage 1.5: RAG Retrieval
@@ -211,7 +211,7 @@ class TwoPassSummarizer:
             extracted_info=extracted,
             guidelines=guidelines_text
         )
-        structured = self._invoke_model(structuring_prompt, temperature=0.05)
+        structured = self._invoke_model(structuring_prompt, temperature=0.01)
         # Strip conversational filler
         structured = self._strip_conversational_prefix(structured)
 
@@ -338,7 +338,7 @@ class TwoPassSummarizer:
         
         return transcript
 
-    def _invoke_model(self, prompt: str, temperature: float = 0.1) -> str:
+    def _invoke_model(self, prompt: str, temperature: float = 0.05) -> str:
         """Invoke the model with optimized parameters."""
         payload = {
             "model": self.config.model,
