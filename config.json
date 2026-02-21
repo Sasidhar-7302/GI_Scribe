@@ -31,7 +31,7 @@
   "summarizer": {
     "provider": "ollama",
     "base_url": "http://127.0.0.1:11434",
-    "model": "llama3",
+    "model": "llama3.1",
     "fallback_model": "",
     "temperature": 0.0,
     "max_tokens": 8000,
