@@ -215,6 +215,7 @@ class WhisperTranscriber:
             device_index=getattr(self.config, "device_index", 0),
             compute_type=compute,
             download_root=str(download_root),
+            local_files_only=True,
         )
         return self._faster_model
 
