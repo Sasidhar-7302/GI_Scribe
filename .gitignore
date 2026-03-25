@@ -8,42 +8,64 @@ env/
 venv/
 .venv/
 pip-log.txt
-pip-delete-this-directory.txt
 
-# Project specific
-models/
+# Node / Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+.next/
+
+# Project specific - PHI & sensitive data
 local_storage/
-tmp/
-tmp_extract/
-reports/
-!reports/*.md
-!reports/*.json
+!local_storage/.gitkeep
+models/
+!models/.gitkeep
+medrec.db
+config.json
+data/GiAudiotest/
+data/GiTestValid/
 
-# Large data (Over 100MB Limit)
+# Large binary files
 data/gi_data.zip
 assets/*.zip
 external/OllamaSetup.exe
 external/gi_data.zip
-
-# Build artifacts
-external/whisper.cpp/build/
-external/whisper.cpp/out/
-
-# IDEs
-
-# Large/Temp files
+external/*.exe
 cuda_libs/
 cuda_libs.7z
+*.mp3
+*.wav
+
+# Build artifacts
+build/
+dist/
+*.spec
+external/whisper.cpp/build/
+external/whisper.cpp/out/
+external/faster-whisper/
+external/whisperx_new/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp & debug
+tmp/
+temp/
+tmp_extract/
 unsloth_compiled_cache/
 debug_output.txt
 results.txt
 verify90_output.txt
-config.json
-*.mp3
-*.wav
-data/GiAudiotest/
-data/GiTestValid/
-external/whisperx_new/
-external/*.exe
-external/faster-whisper/
-temp/
+test_results.txt
+test_results_base.txt
+
+# Gemini agent files
+.gemini/

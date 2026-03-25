@@ -27,6 +27,8 @@ try:
 except ImportError:
     HAS_RAG = False
 
+from .database import DatabaseManager
+
 
 @dataclass
 class StructuredSummary:
@@ -43,15 +45,18 @@ class StructuredSummary:
 
 
 EXTRACTION_PROMPT = """### Instruction:
-You are a medical information extractor. Extract clinical details from the transcript below.
+You are a high-precision medical information extractor. Extract clinical details from the transcript below.
 Translate patient terms to medical terms (e.g. "bloody stools" -> "hematochezia").
 
-**REASONING RULES:**
-1. Group symptoms by type and timing.
-2. Identify medications and their intent.
-3. List any alarm symptoms (bleeding, weight loss).
-4. Identify any PLANNED tests, procedures, or referrals mentioned by the doctor (e.g. "we will do", "I'll order", "let's check").
-5. If missing, write "Not mentioned".
+**OUTPUT SCHEMA:**
+Return exactly these sections. If information is missing, write "Not documented".
+[CHIEF COMPLAINT]: Primary reason for visit.
+[HISTORY]: Timeline of symptoms, onset, duration, severity, triggers (Paragraph format).
+[SYMPTOMS]: List of all pertinent positive/negative symptoms.
+[MEDICATIONS]: Current medications and intent mentioned.
+[ALARM SIGNS]: Presence or absence of bleeding, weight loss, fever, or jaundice.
+[PHYSICAL EXAM]: Any exam findings mentioned by the doctor.
+[PLANNED ACTIONS]: Any tests, procedures, or referrals the doctor plans to order.
 
 ### GI Context hints:
 {gi_hints}
@@ -59,7 +64,7 @@ Translate patient terms to medical terms (e.g. "bloody stools" -> "hematochezia"
 ### Transcript:
 {transcript}
 
-### Extracted Information:
+### Extracted Clinical Facts:
 """
 
 
@@ -92,21 +97,23 @@ Follow-up:
 - (Timing. If none, write "Not documented")
 """
 
-STRUCTURING_PROMPT = """You are a clinical note formatter. Use the exact structure below.
-Only include information explicitly found in the extracted text.
-Use Guidelines {guidelines} ONLY for the 'Plan' section.
-Do NOT hallucinate a diagnosis. Use "Not yet specified" if unclear.
-Include planned actions mentioned in conversation (e.g. "We'll do a CT scan") even if not formally ordered yet.
-<</SYS>>
+STRUCTURING_PROMPT = """### Instruction:
+You are a senior gastroenterologist scribe. Structure the following facts into a formal, EHR-ready clinical note.
+Use the exact structure specified below.
+
+**STRICT RULES:**
+1. **HPI (History of Present Illness)**: Write a professional, detailed narrative paragraph (minimum 4-5 sentences). Synthesize the [HISTORY], [CHIEF COMPLAINT], and [SYMPTOMS] into a clinical story.
+2. **Assessment**: Provide a numbered problem list. For every diagnosis, include supporting evidence from the transcript (e.g., "1. Dyspepsia - supported by epigastric pain").
+3. **Plan**: Detail the management for each problem.
+4. **Accuracy**: Only include information found in the [Extracted Facts].
 
 {few_shot_examples}
 
 ### Extracted Facts:
 {extracted_info}
 
-### Clinical SOAP Note:
-[/INST]
-HPI (History of Present Illness):"""
+### Clinical Note Output (Start with HPI):
+"""
 
 
 SELF_CORRECTION_PROMPT = """[INST] <<SYS>>
@@ -156,6 +163,7 @@ class TwoPassSummarizer:
         self.max_retries = 2
         self.gi_hints = f"GI Terminology: {build_gi_hint(max_terms=40)}"
         self.rag = GuidelineRAG() if HAS_RAG else None
+        self.db = DatabaseManager("medrec.db")
 
     @property
     def _endpoint(self) -> str:
@@ -206,18 +214,25 @@ class TwoPassSummarizer:
 
         # Stage 2: Structuring (Pass 2)
         self.logger.info("two_pass_summarizer | stage=2 | action=structuring")
+        
+        # Self-Learning: Inject physician's learned preferences + recent corrections
+        style_guide = self._get_physician_style_guide()
+        contextual_few_shot = TEMPLATE_STYLE
+        if style_guide:
+            contextual_few_shot = style_guide + "\n" + TEMPLATE_STYLE
+
         structuring_prompt = STRUCTURING_PROMPT.format(
-            few_shot_examples=TEMPLATE_STYLE,
+            few_shot_examples=contextual_few_shot,
             extracted_info=extracted,
             guidelines=guidelines_text
         )
-        structured = self._invoke_model(structuring_prompt, temperature=0.01)
+        structured = self._invoke_model(structuring_prompt, temperature=0.1)
         # Strip conversational filler
         structured = self._strip_conversational_prefix(structured)
 
-        # Prepend the HPI header since we put it in the prompt as a stop/start
-        if not structured.strip().startswith("HPI") and "HPI" not in structured[:20]:
-             structured = "HPI (History of Present Illness): " + structured
+        # Prepend the HPI header if missing
+        if not structured.strip().startswith("HPI"):
+             structured = "HPI (History of Present Illness):\n" + structured
 
         final_note = structured # Initialize final_note with the structured output
 
@@ -270,6 +285,47 @@ class TwoPassSummarizer:
             runtime_s=runtime,
             model_used=self.config.model,
         )
+
+    def _get_feedback_examples(self) -> str:
+        """Retrieve recent summary feedback to guide the LLM's style."""
+        try:
+            with self.db._get_connection() as conn:
+                import sqlite3
+                conn.row_factory = sqlite3.Row
+                cursor = conn.execute(
+                    "SELECT original_content, edited_content FROM feedback WHERE field = 'summary' ORDER BY timestamp DESC LIMIT 2"
+                )
+                rows = cursor.fetchall()
+                if not rows:
+                    return ""
+                
+                examples = []
+                for i, row in enumerate(rows):
+                    examples.append(f"Correction {i+1}:\n- INSTEAD OF: {row['original_content'][:200]}...\n- USE STYLE: {row['edited_content'][:500]}")
+                
+                return "\n\n".join(examples)
+        except Exception as e:
+            self.logger.warning(f"Could not load feedback examples: {e}")
+            return ""
+
+    def _get_physician_style_guide(self) -> str:
+        """Build a comprehensive style guide from learned preferences + recent corrections."""
+        parts = []
+
+        # 1. Structured preferences from the DB
+        pref_prompt = self.db.get_preference_prompt()
+        if pref_prompt:
+            parts.append(pref_prompt)
+
+        # 2. Concrete correction examples (last 2)
+        examples = self._get_feedback_examples()
+        if examples:
+            parts.append("### RECENT CORRECTION EXAMPLES:\n" + examples)
+
+        if not parts:
+            return ""
+
+        return "\n\n".join(parts)
 
     def summarize_text(self, transcript: str, style: Optional[str] = None) -> str:
         """Generate summary and return as formatted text."""
@@ -446,22 +502,24 @@ class TwoPassSummarizer:
         if not raw_text:
             return ""
         
-        # Look for Patient History section in raw extraction
-        # Because we don't control the raw output format strictly, we try multiple patterns
+        # Look for [HISTORY] or [CHIEF COMPLAINT] sections in the new tagged schema
         patterns = [
+            r"\[HISTORY\]:?\s*\n?(.*?)(?=\n\[|$)",
+            r"\[CHIEF COMPLAINT\]:?\s*\n?(.*?)(?=\n\[|$)",
             r"PATIENT HISTORY:?\s*\n(.*?)(?=\n\d+\.|\n[A-Z]+|$)",
-            r"1\.\s*PATIENT HISTORY:?\s*\n(.*?)(?=\n\d+\.|\n[A-Z]+|$)",
-            r"History:?\s*\n(.*?)(?=\n\d+\.|\n[A-Z]+|$)",
-            r"history:?\s*\n(.*?)(?=\n\d+\.|\n[A-Z]+|$)"
+            r"History:?\s*\n(.*?)(?=\n\d+\.|\n[A-Z]+|$)"
         ]
         
+        extracted_parts = []
         for pattern in patterns:
             match = re.search(pattern, raw_text, re.DOTALL | re.IGNORECASE)
             if match:
                 clean = match.group(1).strip()
-                # If it starts with a bullet/number, strip it
-                clean = re.sub(r"^[\d\-\*\.]+\s+", "", clean).strip()
-                return clean
+                if clean and "not documented" not in clean.lower():
+                    extracted_parts.append(clean)
+        
+        if extracted_parts:
+             return " ".join(extracted_parts)
         return ""
 
     def _extract_section(self, text: str, section_name: str) -> str:
