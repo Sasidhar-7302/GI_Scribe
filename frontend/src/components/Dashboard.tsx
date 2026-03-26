@@ -75,7 +75,7 @@ export const Dashboard = ({ initialSessionId, onSessionLoaded, onSessionsChange,
             const data = rawData as WSMessage & { percentage?: number };
             if (data.type === "transcript" && data.text) {
                 setTranscript(data.text);
-                setStatus(data.percentage ? `Transcribing... ${data.percentage}%` : "Transcribing...");
+                setStatus(data.percentage !== undefined ? `Transcribing... ${data.percentage}%` : "Transcribing...");
             } else if (data.type === "summary" && data.text && data.uuid) {
                 setSummary(data.text);
                 setStatus("Complete");
@@ -132,9 +132,14 @@ export const Dashboard = ({ initialSessionId, onSessionLoaded, onSessionsChange,
 
     // When activeSessionId changes externally (sidebar click), load it
     const prevSessionRef = useRef<string | null>(null);
+    const isNewSessionRef = useRef<boolean>(false);
     useEffect(() => {
         if (activeSessionId && activeSessionId !== prevSessionRef.current) {
-            handleLoadSession(activeSessionId);
+            if (isNewSessionRef.current) {
+                isNewSessionRef.current = false;
+            } else {
+                handleLoadSession(activeSessionId);
+            }
         }
         prevSessionRef.current = activeSessionId;
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,9 +205,10 @@ export const Dashboard = ({ initialSessionId, onSessionLoaded, onSessionsChange,
                 setStatus("Uploading...");
                 setTranscript("");
                 setSummary("");
+                isNewSessionRef.current = true;
                 const res = await api.uploadAudio(file);
                 onActiveSessionChange(res.uuid);
-                setStatus("Transcribing...");
+                setStatus("Initializing AI...");
                 setSuccess(`Processing: ${file.name}`);
                 setTimeout(() => setSuccess(null), 3000);
             } catch {
@@ -223,9 +229,10 @@ export const Dashboard = ({ initialSessionId, onSessionLoaded, onSessionsChange,
         try {
             setError(null);
             if (!isRecording) {
+                isNewSessionRef.current = true;
                 const res = await api.startRecording();
                 setIsRecording(true);
-                setStatus("Recording");
+                setStatus("Recording...");
                 setTranscript("");
                 setSummary("");
                 onActiveSessionChange(res.uuid);
@@ -234,7 +241,7 @@ export const Dashboard = ({ initialSessionId, onSessionLoaded, onSessionsChange,
             } else {
                 if (activeSessionId) await api.stopRecording(activeSessionId);
                 setIsRecording(false);
-                setStatus("Processing...");
+                setStatus("Initializing AI...");
                 setIsProcessing(true);
                 if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
             }
