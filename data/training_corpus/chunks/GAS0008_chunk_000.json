@@ -1,6 +1,0 @@
-{
-    "audio_file": "data\\training_corpus\\chunks\\GAS0008_chunk_000.mp3",
-    "raw_transcript": "Good evening, Mr. Thompson. I'm Dr. Chen. I've been reviewing your chart, and it looks like you've been struggling with some persistent reflux for a long time. I see you're on high-dose Omeprazole. Can you tell me more about what's been happening lately?",
-    "final_corrected_note": "Good evening, Mr. Thompson. I'm Dr. Chen. I've been reviewing your chart, and it looks like you've been struggling with some persistent reflux for a long time. I see you're on high-dose Omeprazole. Can you tell me more about what's been happening lately?",
-    "was_edited": true
-}

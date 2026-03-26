@@ -24,6 +24,13 @@ medrec.db
 config.json
 data/GiAudiotest/
 data/GiTestValid/
+data/*.jsonl
+data/*.pkl
+data/*.json
+!data/gi_terms.txt
+data/training_corpus/
+data/training_data/
+data/training_manifests/
 
 # Large binary files
 data/gi_data.zip
