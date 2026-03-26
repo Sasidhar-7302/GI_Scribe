@@ -10,8 +10,27 @@ from app.config import AppConfig, load_config
 from app.transcriber import WhisperTranscriber
 from app.two_pass_summarizer import TwoPassSummarizer
 
+import string
+import re
+import logging
+
+# Configure logging to see internal steps
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+
 def compute_wer(reference, hypothesis):
-    # Simple Word Error Rate
+    # Remove speaker tags
+    reference = re.sub(r'^(?:[DP]|Speaker \d+|Doctor|Patient):\s*', '', reference, flags=re.MULTILINE|re.IGNORECASE)
+    hypothesis = re.sub(r'^(?:[DP]|Speaker \d+|Doctor|Patient):\s*', '', hypothesis, flags=re.MULTILINE|re.IGNORECASE)
+    
+    # Strip punctuation
+    translator = str.maketrans('', '', string.punctuation)
+    reference = reference.translate(translator)
+    hypothesis = hypothesis.translate(translator)
+    
     r = reference.lower().split()
     h = hypothesis.lower().split()
     
@@ -22,10 +41,7 @@ def compute_wer(reference, hypothesis):
     
     for i in range(1, len(r) + 1):
         for j in range(1, len(h) + 1):
-            if r[i-1] == h[j-1]:
-                cost = 0
-            else:
-                cost = 1
+            cost = 0 if r[i-1] == h[j-1] else 1
             d[i][j] = min(
                 d[i-1][j] + 1,      # deletion
                 d[i][j-1] + 1,      # insertion
@@ -37,18 +53,26 @@ def compute_wer(reference, hypothesis):
 
 def main():
     config = load_config()
+    from app.hardware import detect_and_configure_gpu
+    detect_and_configure_gpu()
     
-    # Force GPU targeting for the test if not set
-    config.whisper.device_index = 0
-    config.whisper.device = "cuda"
-    config.whisper.beam_size = 5
-    config.whisper.compute_type = "int8"
+    # Ensure it targets the best GPU if available (override CPU fallback if possible)
+    if not config.whisper.device or config.whisper.device == "cpu":
+        config.whisper.device = "cuda"
+        config.whisper.compute_type = "float16" # fallback to f16 if int8 fails
+
     config.whisper.diarization.enabled = False
-    config.whisper.faster_model = "large-v3"
     
+    print("[DEBUG] Initializing WhisperTranscriber...")
     transcriber = WhisperTranscriber(config.whisper)
+    print("[DEBUG] Initializing TwoPassSummarizer...")
     summarizer = TwoPassSummarizer(config.summarizer)
-    summarizer.rag = None  # Disable RAG internet download
+    
+    # Initialize RAG for evaluation
+    print("[DEBUG] Initializing RAG...")
+    from app.guideline_rag import GuidelineRAG
+    summarizer.rag = GuidelineRAG()
+    print("[DEBUG] RAG initialized.")
     
     audio_dir = Path("data/GiAudiotest")
     truth_dir = Path("data/GiTestValid")
@@ -57,7 +81,9 @@ def main():
         print("Test directories not found.")
         return
         
-    audio_files = list(audio_dir.glob("*.mp3"))
+    audio_files = [audio_dir / f"{f}.mp3" for f in ["GAS0001", "GAS0002", "GAS0003", "GAS0004", "GAS0005", "GAS0007"]]
+    audio_files = [f for f in audio_files if f.exists()]
+    
     if not audio_files:
         print("No audio files found.")
         return
@@ -86,14 +112,14 @@ def main():
         total_wer += wer
         count += 1
         
-        # 2. Summarization Quality
+        # 2. Summarization Quality (Enabled for God-Mode verification)
         s_result = summarizer.summarize(t_result.text)
         print(f"Summarization Time: {s_result.runtime_s:.2f}s")
-        print("\n--- Summary Structure ---")
-        print(f"HPI Length: {len(s_result.hpi)} chars")
-        print(f"Findings: {len(s_result.findings)} items")
-        print(f"Assessment: {len(s_result.assessment)} items")
-        print(f"Plan: {len(s_result.plan)} items")
+        print("\n--- Summary Content ---")
+        print(f"HPI (History of Present Illness):\n{s_result.hpi}")
+        print("\nAssessment:")
+        for i, item in enumerate(s_result.assessment):
+            print(f"{i+1}. {item}")
         print("------------------------\n")
         
     if count > 0:

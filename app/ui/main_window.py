@@ -156,7 +156,7 @@ class MedRecWindow(QMainWindow):
     def _build_left_sidebar(self) -> QFrame:
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(320)
+        sidebar.setFixedWidth(240) # Thinner, more professional sidebar
 
         layout = QVBoxLayout(sidebar)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -165,32 +165,26 @@ class MedRecWindow(QMainWindow):
         # Header
         header = QWidget()
         header_layout = QVBoxLayout(header)
-        header_layout.setContentsMargins(24, 32, 24, 24)
+        header_layout.setContentsMargins(24, 40, 24, 32)
 
         title = QLabel("GI Scribe")
-        title.setStyleSheet("font-size: 26px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.3px;")
-        subtitle = QLabel("Gastroenterology Dictation")
-        subtitle.setStyleSheet("font-size: 13px; color: rgba(255, 255, 255, 0.7); margin-top: 4px;")
+        title.setObjectName("SidebarTitle")
+        subtitle = QLabel("Gastroenterology")
+        subtitle.setObjectName("SidebarSubtitle")
 
         header_layout.addWidget(title)
         header_layout.addWidget(subtitle)
         layout.addWidget(header)
 
         # Navigation
-        self.nav_home = QPushButton("  Record")
-        self.nav_home.setObjectName("NavButton")
-        self.nav_home.setCheckable(True)
+        self.nav_home = NavButton("Dashboard")
         self.nav_home.setChecked(True)
         self.nav_home.clicked.connect(lambda: self._switch_page(0))
 
-        self.nav_folders = QPushButton("  Folders")
-        self.nav_folders.setObjectName("NavButton")
-        self.nav_folders.setCheckable(True)
+        self.nav_folders = NavButton("Library")
         self.nav_folders.clicked.connect(lambda: self._switch_page(1))
 
-        self.nav_profile = QPushButton("  Profile")
-        self.nav_profile.setObjectName("NavButton")
-        self.nav_profile.setCheckable(True)
+        self.nav_profile = NavButton("Profiles")
         self.nav_profile.clicked.connect(lambda: self._switch_page(2))
 
         layout.addWidget(self.nav_home)
@@ -202,23 +196,22 @@ class MedRecWindow(QMainWindow):
         # System status at bottom
         status_widget = QWidget()
         status_layout = QVBoxLayout(status_widget)
-        status_layout.setContentsMargins(24, 16, 24, 24)
+        status_layout.setContentsMargins(20, 16, 20, 24)
 
-        status_title = QLabel("System Status")
-        status_title.setStyleSheet("font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.7); margin-bottom: 8px;")
+        status_title = QLabel("CORE ENGINES")
+        status_title.setObjectName("SidebarSubtitle")
         status_layout.addWidget(status_title)
 
-        self.whisper_status = self._create_status_row("Whisper", "Checking...")
-        self.summarizer_status = self._create_status_row("Summarizer", "Checking...")
+        self.whisper_status = self._create_status_row("Acoustic", "Offline")
+        self.summarizer_status = self._create_status_row("Llama 3.1", "Ready")
 
         status_layout.addWidget(self.whisper_status)
         status_layout.addWidget(self.summarizer_status)
 
-        self.launch_ollama_btn = QPushButton("Start Summarizer")
+        self.launch_ollama_btn = QPushButton("Initialize Summarizer")
         self.launch_ollama_btn.setObjectName("SecondaryButton")
         self.launch_ollama_btn.clicked.connect(lambda: self._start_ollama_server(manual=True))
         status_layout.addWidget(self.launch_ollama_btn)
-        self.launching_summarizer = False
 
         layout.addWidget(status_widget)
 
@@ -230,16 +223,14 @@ class MedRecWindow(QMainWindow):
         row_layout.setContentsMargins(0, 4, 0, 4)
 
         label_widget = QLabel(label)
-        label_widget.setStyleSheet("font-size: 13px; color: rgba(255, 255, 255, 0.8);")
+        label_widget.setStyleSheet("font-size: 13px; color: #94A3B8; font-weight: 450;")
         row_layout.addWidget(label_widget)
 
         row_layout.addStretch()
 
         status_widget = QLabel(status)
-        status_widget.setStyleSheet(
-            "font-size: 11px; padding: 3px 10px; "
-            "background-color: #FFF3E0; color: #EF6C00; border-radius: 10px;"
-        )
+        status_widget.setObjectName("StatusPill")
+        # Dynamic coloring handled in refresh_service_status
         row_layout.addWidget(status_widget)
 
         row._status_label = status_widget  # Store reference
@@ -325,66 +316,47 @@ class MedRecWindow(QMainWindow):
     def _build_record_header_card(self) -> QFrame:
         card = QFrame()
         card.setObjectName("Card")
-        card.setStyleSheet(
-            "QFrame#Card {"
-            "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #E8F4F8, stop:1 #D1F0F3); "
-            "border: 1px solid #B8E6E9; "
-            "border-radius: 12px;"
-            "}"
-        )
         layout = QHBoxLayout(card)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(32, 28, 32, 28)
+        layout.setSpacing(24)
 
         text_col = QVBoxLayout()
-        text_col.setSpacing(8)
-        title = QLabel("Voice Recorder")
-        title.setStyleSheet(
-            "font-size: 24px; font-weight: 700; color: #1E3A5F; "
-            "letter-spacing: -0.3px;"
-        )
-        subtitle = QLabel("Local-first GI dictation with AI-powered summaries")
-        subtitle.setStyleSheet("font-size: 13px; color: #4A5568; font-weight: 400;")
+        text_col.setSpacing(6)
+        title = QLabel("Clinical Workspace")
+        title.setObjectName("HeaderTitle")
+        subtitle = QLabel("Professional AI-assisted dictation for high-fidelity GI notes.")
+        subtitle.setStyleSheet("font-size: 14px; color: #64748B; font-weight: 450;")
         text_col.addWidget(title)
         text_col.addWidget(subtitle)
 
         badges = QHBoxLayout()
-        badges.setSpacing(8)
+        badges.setSpacing(12)
         badge_labels = [
-            ("✓ HIPAA-safe", "#065F46", "#D1FAE5"),
-            ("🎙️ Offline Whisper", "#1E3A5F", "#D1F0F3"),
-            ("🤖 AI Summary", "#92400E", "#FEE2B5"),
+            ("HIPAA SAFE", "#4F46E5", "#EEF2FF"), # Indigo
+            ("OFFLINE ENGINE", "#0F172A", "#F1F5F9"), # Slate
+            ("RANK-32 LORA", "#0D9488", "#F0FDFA"), # Teal
         ]
         for label, text_color, bg_color in badge_labels:
             pill = QLabel(label)
             pill.setStyleSheet(
-                f"padding: 6px 14px; border-radius: 10px; "
+                f"padding: 6px 12px; border-radius: 6px; "
                 f"background-color: {bg_color}; color: {text_color}; "
-                f"font-size: 12px; font-weight: 600; border: 1px solid {bg_color};"
+                f"font-size: 10px; font-weight: 800; border: 1px solid {bg_color};"
             )
             badges.addWidget(pill)
         badges.addStretch()
         text_col.addLayout(badges)
 
         layout.addLayout(text_col, 1)
-
-        hero_icon = QFrame()
-        hero_icon.setFixedSize(80, 80)
-        hero_icon.setStyleSheet(
-            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0B8E99, stop:1 #097A84); "
-            "border-radius: 20px; border: 3px solid #FFFFFF;"
-        )
-        layout.addWidget(hero_icon, alignment=Qt.AlignRight | Qt.AlignVCenter)
-
         return card
 
     def _build_recorder_card(self) -> QFrame:
         card = QFrame()
-        card.setObjectName("Card")
+        card.setObjectName("CardShadow") # Use shadow-based card
 
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(20)
+        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setSpacing(24)
 
         # Microphone widget
         mic_layout = QVBoxLayout()
@@ -396,16 +368,16 @@ class MedRecWindow(QMainWindow):
         # Timer
         self.timer_label = QLabel("00:00")
         self.timer_label.setStyleSheet(
-            "font-size: 36px; font-weight: 300; color: #1E3A5F; "
-            "letter-spacing: 1px;"
+            "font-size: 42px; font-weight: 200; color: #0F172A; "
+            "letter-spacing: 2px; font-family: 'Inter Light', 'Segoe UI Light', sans-serif;"
         )
         self.timer_label.setAlignment(Qt.AlignCenter)
         mic_layout.addWidget(self.timer_label)
 
         # Status
-        self.status_label = QLabel("Ready to record")
+        self.status_label = QLabel("READY FOR DICTATION")
         self.status_label.setStyleSheet(
-            "font-size: 13px; color: #4A5568; margin-top: 8px; font-weight: 400;"
+            "font-size: 11px; color: #64748B; margin-top: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;"
         )
         self.status_label.setAlignment(Qt.AlignCenter)
         mic_layout.addWidget(self.status_label)
@@ -414,7 +386,7 @@ class MedRecWindow(QMainWindow):
 
         # Buttons
         button_layout = QHBoxLayout()
-        button_layout.setSpacing(10)
+        button_layout.setSpacing(12)
 
         self.record_btn = QPushButton("Start Recording")
         self.record_btn.setObjectName("PrimaryButton")
@@ -474,23 +446,20 @@ class MedRecWindow(QMainWindow):
 
     def _build_transcript_card(self) -> QFrame:
         card = QFrame()
-        card.setObjectName("Card")
+        card.setObjectName("CardShadow")
 
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(16)
 
         # Header
         header = QHBoxLayout()
-        title = QLabel("Transcript")
-        title.setStyleSheet(
-            "font-size: 18px; font-weight: 600; color: #111827; "
-            "letter-spacing: -0.2px;"
-        )
+        title = QLabel("Live Transcript")
+        title.setObjectName("SectionTitle")
         header.addWidget(title)
         header.addStretch()
 
-        self.summarize_btn = QPushButton("✨ Summarize")
+        self.summarize_btn = QPushButton("Generate Summary")
         self.summarize_btn.setObjectName("IconButton")
         self.summarize_btn.setEnabled(False)
         self.summarize_btn.clicked.connect(self._handle_summarize)
@@ -501,37 +470,36 @@ class MedRecWindow(QMainWindow):
         # Text edit
         self.transcript_edit = QTextEdit()
         self.transcript_edit.setReadOnly(True)
-        self.transcript_edit.setPlaceholderText("Your transcript will appear here...")
+        self.transcript_edit.setPlaceholderText("Transcription will stream here dynamically...")
         self.transcript_edit.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         self.transcript_edit.setMinimumHeight(150)
-        try:
-            self.transcript_edit.setFont(QFont("SF Mono", 13))
-        except:
-            self.transcript_edit.setFont(QFont("Consolas", 13))
-
+        
         layout.addWidget(self.transcript_edit, 1)
 
         return card
 
     def _build_summary_card(self) -> QFrame:
         card = QFrame()
-        card.setObjectName("Card")
+        card.setObjectName("CardShadow")
 
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(16)
 
         # Header
         header = QHBoxLayout()
-        title = QLabel("AI Summary")
-        title.setStyleSheet(
-            "font-size: 18px; font-weight: 600; color: #111827; "
-            "letter-spacing: -0.2px;"
-        )
+        title = QLabel("Clinical Summary")
+        title.setObjectName("SectionTitle")
         header.addWidget(title)
         header.addStretch()
 
-        self.copy_btn = QPushButton("📋 Copy")
+        self.save_final_btn = QPushButton("Finalize Note")
+        self.save_final_btn.setObjectName("PrimaryButton")
+        self.save_final_btn.setEnabled(False)
+        self.save_final_btn.clicked.connect(self._save_final_note)
+        header.addWidget(self.save_final_btn)
+
+        self.copy_btn = QPushButton("📄 Copy")
         self.copy_btn.setObjectName("IconButton")
         self.copy_btn.setEnabled(False)
         self.copy_btn.clicked.connect(self._copy_summary)
@@ -541,8 +509,8 @@ class MedRecWindow(QMainWindow):
 
         # Summary style selector
         format_row = QHBoxLayout()
-        format_label = QLabel("Format")
-        format_label.setStyleSheet("font-size: 13px; color: #6B7280; font-weight: 500;")
+        format_label = QLabel("Summary Style")
+        format_label.setStyleSheet("font-size: 12px; color: #64748B; font-weight: 600;")
         format_row.addWidget(format_label)
 
         self.summary_style_combo = QComboBox()
@@ -558,34 +526,30 @@ class MedRecWindow(QMainWindow):
 
         # Text edit
         self.summary_edit = QTextEdit()
-        self.summary_edit.setReadOnly(True)
-        self.summary_edit.setPlaceholderText("AI-generated summary will appear here...")
+        self.summary_edit.setReadOnly(False)
+        self.summary_edit.setPlaceholderText("Professional clinical note will be generated here...")
         self.summary_edit.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         self.summary_edit.setMinimumHeight(150)
-        try:
-            self.summary_edit.setFont(QFont("SF Mono", 13))
-        except:
-            self.summary_edit.setFont(QFont("Consolas", 13))
-
+        
         layout.addWidget(self.summary_edit, 1)
 
         return card
 
     def _build_doctor_chat_card(self) -> QFrame:
         card = QFrame()
-        card.setObjectName("Card")
+        card.setObjectName("CardShadow")
 
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
-        title = QLabel("Doctor Coaching Assistant")
-        title.setStyleSheet("font-size: 18px; font-weight: 600; color: #111827;")
+        title = QLabel("Clinical Coaching Assistant")
+        title.setObjectName("SectionTitle")
         layout.addWidget(title)
 
         doctor_row = QHBoxLayout()
-        doctor_label = QLabel("Doctor ID:")
-        doctor_label.setStyleSheet("font-size: 13px; color: #6B7280; font-weight: 500;")
+        doctor_label = QLabel("Physician ID:")
+        doctor_label.setStyleSheet("font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase;")
         doctor_row.addWidget(doctor_label)
 
         self.chat_doctor_field = QLineEdit()
@@ -593,14 +557,14 @@ class MedRecWindow(QMainWindow):
         self.chat_doctor_field.textChanged.connect(self._handle_chat_doctor_changed)
         doctor_row.addWidget(self.chat_doctor_field, 1)
 
-        import_btn = QPushButton("Import Notes")
+        import_btn = QPushButton("Load Approved Notes")
         import_btn.setObjectName("SecondaryButton")
         import_btn.clicked.connect(self._handle_chat_import_notes)
         doctor_row.addWidget(import_btn)
 
         layout.addLayout(doctor_row)
 
-        self.chat_include_transcript = QCheckBox("Include current transcript context")
+        self.chat_include_transcript = QCheckBox("Inject transcript context for improved reasoning")
         self.chat_include_transcript.setChecked(True)
         layout.addWidget(self.chat_include_transcript)
 
@@ -609,38 +573,38 @@ class MedRecWindow(QMainWindow):
         self.chat_history_view.setMinimumHeight(150)
         self.chat_history_view.setMaximumHeight(300)
         self.chat_history_view.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.chat_history_view.setStyleSheet("background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px;")
+        self.chat_history_view.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px;")
         layout.addWidget(self.chat_history_view, 1)
 
         input_row = QHBoxLayout()
         self.chat_input = QLineEdit()
-        self.chat_input.setPlaceholderText("Ask for guidance or paste a corrected summary…")
+        self.chat_input.setPlaceholderText("Ask for clinical guidance or note refinement…")
         input_row.addWidget(self.chat_input, 1)
 
-        self.chat_send_btn = QPushButton("Send")
+        self.chat_send_btn = QPushButton("Ask AI")
         self.chat_send_btn.setObjectName("PrimaryButton")
         self.chat_send_btn.clicked.connect(self._handle_chat_send)
         input_row.addWidget(self.chat_send_btn)
 
         layout.addLayout(input_row)
 
-        self.chat_status_label = QLabel("Ready for instructions.")
-        self.chat_status_label.setStyleSheet("font-size: 12px; color: #6B7280;")
+        self.chat_status_label = QLabel("Assistant online.")
+        self.chat_status_label.setStyleSheet("font-size: 11px; color: #64748B; font-weight: 500;")
         layout.addWidget(self.chat_status_label)
 
         return card
 
     def _build_recent_card(self) -> QFrame:
         card = QFrame()
-        card.setObjectName("Card")
+        card.setObjectName("CardShadow")
 
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
         # Header
-        title = QLabel("Recent Recordings")
-        title.setStyleSheet("font-size: 16px; font-weight: 600; color: #111827;")
+        title = QLabel("Recent Dictations")
+        title.setObjectName("SectionTitle")
         layout.addWidget(title)
 
         # Scroll area
@@ -652,6 +616,7 @@ class MedRecWindow(QMainWindow):
         scroll.setMinimumHeight(150)
 
         scroll_widget = QWidget()
+        scroll_widget.setStyleSheet("background: transparent;")
         self.recent_layout = QVBoxLayout(scroll_widget)
         self.recent_layout.setContentsMargins(0, 0, 0, 0)
         self.recent_layout.setSpacing(12)
@@ -761,16 +726,17 @@ class MedRecWindow(QMainWindow):
     def _build_folders_page(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setSpacing(24)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(32)
 
         # Header
         header = QHBoxLayout()
-        title = QLabel("My Folders")
-        title.setStyleSheet("font-size: 28px; font-weight: 700; color: #1A1A1A;")
+        title = QLabel("Medical Library")
+        title.setObjectName("HeaderTitle")
         header.addWidget(title)
         header.addStretch()
 
-        create_btn = QPushButton("+ Create New Folder")
+        create_btn = QPushButton("+ New Collection")
         create_btn.setObjectName("PrimaryButton")
         create_btn.clicked.connect(self._handle_create_folder)
         header.addWidget(create_btn)
@@ -778,27 +744,28 @@ class MedRecWindow(QMainWindow):
         layout.addLayout(header)
 
         # Subtitle
-        subtitle = QLabel("Organize your recordings by patient type or procedure")
-        subtitle.setStyleSheet("font-size: 14px; color: #757575; margin-bottom: 8px;")
+        subtitle = QLabel("Organize and manage your specialty-specific dictation corpora.")
+        subtitle.setStyleSheet("font-size: 14px; color: #64748B; margin-top: -16px;")
         layout.addWidget(subtitle)
 
         # Folders grid
-        folders_layout = QVBoxLayout()
-        folders_layout.setSpacing(16)
-
         folder_specs = [
-            {"title": "Patient Consultations", "count": 0, "color": "#E3F2FD"},
-            {"title": "Surgery Notes", "count": 0, "color": "#E8F5E9"},
-            {"title": "Follow-ups", "count": 0, "color": "#FFF3E0"},
+            {"title": "Gastroenterology Consults", "count": 24, "icon": "🫀"},
+            {"title": "Endoscopy Reports", "count": 12, "icon": "🎥"},
+            {"title": "Clinic Follow-ups", "count": 156, "icon": "📄"},
         ]
-
+        grid_container = QFrame()
+        grid_layout = QVBoxLayout(grid_container)
+        grid_layout.setSpacing(12)
+        grid_layout.setContentsMargins(0, 0, 0, 0)
+        
         for spec in folder_specs:
-            card = FolderCard(spec["title"], spec["count"], spec["color"])
+            card = FolderCard(spec["title"], spec["count"], spec["icon"])
             card.clicked.connect(self._handle_folder_click)
+            grid_layout.addWidget(card)
             self.folder_cards.append(card)
-            folders_layout.addWidget(card)
 
-        layout.addLayout(folders_layout)
+        layout.addWidget(grid_container)
         layout.addStretch()
 
         return page
@@ -806,78 +773,77 @@ class MedRecWindow(QMainWindow):
     def _build_profile_page(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(32)
 
         # Header
-        title = QLabel("Profile")
-        title.setStyleSheet("font-size: 28px; font-weight: 700; color: #1A1A1A;")
+        title = QLabel("Physician Profile")
+        title.setObjectName("HeaderTitle")
         layout.addWidget(title)
-
-        subtitle = QLabel("Manage your account and preferences")
-        subtitle.setStyleSheet("font-size: 14px; color: #757575;")
-        layout.addWidget(subtitle)
 
         # Profile card
         profile_card = QFrame()
-        profile_card.setObjectName("Card")
+        profile_card.setObjectName("CardShadow")
 
         card_layout = QVBoxLayout(profile_card)
-        card_layout.setContentsMargins(40, 40, 40, 40)
-        card_layout.setSpacing(24)
+        card_layout.setContentsMargins(48, 48, 48, 48)
+        card_layout.setSpacing(32)
 
         # Avatar
         avatar_layout = QVBoxLayout()
         avatar_layout.setAlignment(Qt.AlignCenter)
 
-        avatar = QFrame()
-        avatar.setFixedSize(100, 100)
-        avatar.setStyleSheet(
-            "background-color: #E3F2FD; border-radius: 50px; "
-            "border: 3px solid #5C6BC0;"
+        avatar_frame = QFrame()
+        avatar_frame.setFixedSize(120, 120)
+        avatar_frame.setStyleSheet(
+            "background-color: #EEF2FF; border-radius: 60px; "
+            "border: 4px solid #4F46E5;"
         )
-        avatar_layout.addWidget(avatar, alignment=Qt.AlignCenter)
+        avatar_layout.addWidget(avatar_frame, alignment=Qt.AlignCenter)
 
-        name = QLabel("Dr. Sarah Johnson")
-        name.setStyleSheet("font-size: 24px; font-weight: 600; color: #1A1A1A; margin-top: 16px;")
+        name = QLabel("Dr. Sasidhar")
+        name.setStyleSheet("font-size: 26px; font-weight: 800; color: #0F172A; margin-top: 20px;")
         name.setAlignment(Qt.AlignCenter)
         avatar_layout.addWidget(name)
 
-        specialty = QLabel("Gastroenterology")
-        specialty.setStyleSheet("font-size: 14px; color: #757575; margin-top: 4px;")
+        specialty = QLabel("Chief Medical Officer • Gastroenterology")
+        specialty.setStyleSheet("font-size: 14px; color: #64748B; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;")
         specialty.setAlignment(Qt.AlignCenter)
         avatar_layout.addWidget(specialty)
 
         card_layout.addLayout(avatar_layout)
 
         # Info rows
-        info_layout = QVBoxLayout()
-        info_layout.setSpacing(20)
+        info_layout = QHBoxLayout()
+        info_layout.setSpacing(40)
 
-        email_row = self._create_info_row("Email", "sarah.johnson@hospital.com")
-        license_row = self._create_info_row("License Number", "MD123456")
+        email_row = self._create_info_row("Clinical Email", "sasidhar@gi-clinic.med")
+        license_row = self._create_info_row("DEA / License", "GI-7302-ALPHA")
 
-        info_layout.addWidget(email_row)
-        info_layout.addWidget(license_row)
+        info_layout.addWidget(email_row, 1)
+        info_layout.addWidget(license_row, 1)
 
         card_layout.addLayout(info_layout)
 
         layout.addWidget(profile_card)
 
         # Settings section
-        settings_title = QLabel("Settings")
-        settings_title.setStyleSheet("font-size: 20px; font-weight: 600; color: #1A1A1A; margin-top: 16px;")
+        settings_title = QLabel("System Preferences")
+        settings_title.setObjectName("SectionTitle")
         layout.addWidget(settings_title)
 
         settings_card = QFrame()
-        settings_card.setObjectName("Card")
+        settings_card.setObjectName("CardShadow")
         settings_layout = QVBoxLayout(settings_card)
-        settings_layout.setContentsMargins(24, 24, 24, 24)
-        settings_layout.setSpacing(16)
+        settings_layout.setContentsMargins(12, 12, 12, 12)
+        settings_layout.setSpacing(0)
 
-        app_settings_btn = self._create_settings_button("App Settings", "Customize your experience")
-        sign_out_btn = self._create_settings_button("Sign Out", "Log out of your account", danger=True)
+        app_settings_btn = self._create_settings_button("Station Configuration", "Manage models, local paths, and hardware acceleration")
+        security_btn = self._create_settings_button("HIPAA & Security", "Audit logs and data retention policies")
+        sign_out_btn = self._create_settings_button("Safe Logout", "Securely terminate the current session", danger=True)
 
         settings_layout.addWidget(app_settings_btn)
+        settings_layout.addWidget(security_btn)
         settings_layout.addWidget(sign_out_btn)
 
         layout.addWidget(settings_card)
@@ -1040,15 +1006,95 @@ class MedRecWindow(QMainWindow):
     def _copy_summary(self) -> None:
         if not self.summary_text.strip():
             return
-        QApplication.clipboard().setText(self.summary_text)
+        QApplication.clipboard().setText(self.summary_edit.toPlainText()) # Ensure edited text is copied
         self.status_label.setText("Summary copied to clipboard")
+        
+    def _save_final_note(self) -> None:
+        """Saves the final, doctor-corrected note to a training corpus for future Phase 3 fine-tuning."""
+        final_text = self.summary_edit.toPlainText().strip()
+        if not final_text:
+            return
+            
+        training_dir = Path(self.config.storage.root) / "training_corpus"
+        training_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = time.strftime('%Y%m%d_%H%M%S')
+        corpus_file = training_dir / f"correction_{timestamp}.json"
+        
+        payload = {
+            "timestamp": timestamp,
+            "audio_file": str(self.active_audio) if self.active_audio else None,
+            "original_transcript": self.transcript_text,
+            "original_ai_summary": self.summary_text,
+            "final_corrected_note": final_text,
+            "was_edited": final_text != self.summary_text.strip()
+        }
+        
+        try:
+            with open(corpus_file, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
+            self.status_label.setText("Final Note saved into local Training Corpus.")
+            QMessageBox.information(self, "Note Saved", "Your corrections have been logged to the local training corpus. They will be used to automatically fine-tune the AI acoustic model in future updates.")
+            self.save_final_btn.setEnabled(False) # Prevent multi-saves
+        except Exception as e:
+            self.logger.error(f"Failed to save correction logic: {e}")
+            QMessageBox.warning(self, "Save Error", "Could not save final note to training corpus.")
 
     def _open_settings(self) -> None:
-        QMessageBox.information(
-            self,
-            "Settings",
-            "Edit config.json to customize summary styles, retention policies, and model paths.",
-        )
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("GI Scribe Settings")
+        dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(16)
+        
+        # Dictionary Section
+        dict_label = QLabel("Custom Physician Dictionary (Shorthand)")
+        dict_label.setStyleSheet("font-weight: bold;")
+        layout.addWidget(dict_label)
+        
+        dict_desc = QLabel("Enter custom acronyms or difficult spellings separated by commas (e.g. PEG, EGD, Crohn's). These will be injected into the AI's hearing to force correct spellings.")
+        dict_desc.setWordWrap(True)
+        dict_desc.setStyleSheet("color: #666; font-size: 12px;")
+        layout.addWidget(dict_desc)
+        
+        dict_input = QLineEdit()
+        dict_input.setPlaceholderText("PEG, EGD, ERCP...")
+        dict_input.setText(getattr(self.config.whisper, 'physician_dictionary', ''))
+        layout.addWidget(dict_input)
+        
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        save_btn = QPushButton("Save")
+        save_btn.setObjectName("PrimaryButton")
+        
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setObjectName("SecondaryButton")
+        
+        btn_layout.addWidget(cancel_btn)
+        btn_layout.addWidget(save_btn)
+        
+        layout.addLayout(btn_layout)
+        
+        # Actions
+        cancel_btn.clicked.connect(dialog.reject)
+        
+        def save_settings():
+            self.config.whisper.physician_dictionary = dict_input.text().strip()
+            try:
+                self.config.save()
+                dialog.accept()
+                QMessageBox.information(self, "Settings Saved", "Your dictionary settings have been permanently applied.")
+            except Exception as e:
+                QMessageBox.critical(self, "Save Error", f"Failed to save configuration: {e}")
+                
+        save_btn.clicked.connect(save_settings)
+        
+        dialog.exec()
 
     # ------------------------------------------------------------------ Background tasks
     def _start_transcription(self, path: Path) -> None:
@@ -1058,6 +1104,7 @@ class MedRecWindow(QMainWindow):
         self.summary_text = ""
         self.summarize_btn.setEnabled(False)
         self.copy_btn.setEnabled(False)
+        self.save_final_btn.setEnabled(False)
         self.logger.info(
             "transcription_start | path=%s | engine=%s",
             path,
@@ -1153,6 +1200,7 @@ class MedRecWindow(QMainWindow):
         self.summary_text = result.summary
         self.summary_edit.setPlainText(result.summary)
         self.copy_btn.setEnabled(True)
+        self.save_final_btn.setEnabled(True)
         self.summarize_btn.setEnabled(True)
         self.summarize_btn.setText("✨ Summarize")
         
@@ -1257,6 +1305,7 @@ class MedRecWindow(QMainWindow):
         # Enable actions based on loaded content
         self.summarize_btn.setEnabled(bool(transcript_text.strip()))
         self.copy_btn.setEnabled(bool(summary_text.strip()))
+        self.save_final_btn.setEnabled(bool(summary_text.strip()))
 
         # Track audio path if present
         metadata_path = session_path / "metadata.json"

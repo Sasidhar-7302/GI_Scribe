@@ -39,13 +39,23 @@ export const api = {
         return data;
     },
 
-    async updateSession(id: string, data: { transcript?: string; summary?: string }) {
+    async updateSession(id: string, data: { transcript?: string; summary?: string; label?: string }) {
         const result = await safeFetch(`${API_URL}/sessions/${id}/feedback`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data),
         });
         if (!result) throw new Error("Failed to save — backend offline.");
+        return result;
+    },
+
+    async updateSessionLabel(id: string, label: string) {
+        const result = await safeFetch(`${API_URL}/sessions/${id}/label`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ label }),
+        });
+        if (!result) throw new Error("Failed to save label");
         return result;
     },
 
@@ -59,11 +69,7 @@ export const api = {
         return data;
     },
 
-    async ingestGas() {
-        const data = await safeFetch(`${API_URL}/ingest/gas`, { method: "POST" });
-        if (!data) throw new Error("Ingestion failed — backend offline.");
-        return data;
-    },
+
 
     connectWS(onMessage: (data: unknown) => void) {
         const ws = new WebSocket(WS_URL);
@@ -74,6 +80,20 @@ export const api = {
             console.warn("WebSocket connection failed — backend may be offline.");
         };
         return ws;
+    },
+
+    // ── Audio Upload ────────────────────────────────────────────────
+
+    async uploadAudio(file: File) {
+        const formData = new FormData();
+        formData.append("file", file);
+        try {
+            const res = await fetch(`${API_URL}/upload`, { method: "POST", body: formData });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        } catch {
+            throw new Error("Upload failed — is the backend running?");
+        }
     },
 
     // ── Adaptive Learning ──────────────────────────────────────────

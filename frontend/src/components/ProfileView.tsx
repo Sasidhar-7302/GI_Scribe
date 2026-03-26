@@ -66,7 +66,7 @@ export const ProfileView = () => {
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
                                 {[
-                                    { icon: User, label: "Full Name", value: "Sasidhar V." },
+                                    { icon: User, label: "Full Name", value: "Sasidhar Y." },
                                     { icon: Award, label: "Medical ID (NPI)", value: "1234567890" },
                                     { icon: Stethoscope, label: "Primary Specialty", value: "Gastroenterology" },
                                     { icon: Building2, label: "Clinical Affiliation", value: "MedRec Health Center" },

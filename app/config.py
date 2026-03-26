@@ -33,7 +33,7 @@ class DiarizationConfig:
 class WhisperConfig:
     binary_path: str = "external/whisper.cpp/build/bin/Release/main.exe"
     model_path: str = "models/whisper/ggml-small.en.bin"
-    faster_model: str = "medium.en"  # download name or local CTranslate2 dir
+    faster_model: str = "models/medical-whisper-large-v3-lora-ct2"  # local CTranslate2 dir or base whisper name
     engine: str = "auto"  # auto selects faster if available
     device: str = "auto"  # auto/cpu/cuda
     compute_type: str = "int8"
@@ -45,6 +45,7 @@ class WhisperConfig:
     extra_args: List[str] = field(default_factory=lambda: ["--print-progress"])
     diarization: DiarizationConfig = field(default_factory=DiarizationConfig)
     device_index: int = 0
+    physician_dictionary: str = ""
 
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> "WhisperConfig":

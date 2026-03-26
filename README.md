@@ -14,6 +14,17 @@
 
 GI Scribe is a **local-first, privacy-preserving** clinical documentation assistant. It records patient encounters, transcribes audio with medical-grade accuracy, and generates structured clinical notes — all running **100% offline** on your hardware.
 
+## 🖥️ Workspace Preview
+
+**Interactive "Ready to Scribe" Console:** Beautiful Framer Motion interpolating dashboard with pulsing mic detection.
+![Ready to Scribe](docs/images/empty_state.png)
+
+**Live Inferencing:** Real-time percentage tracking for the NLP ingestion pipeline directly in the recording bar.
+![Live Transcription](docs/images/transcribing.png)
+
+**High-Contrast Theming:** One-click Light Mode inversion for brightly lit clinic environments without degrading layout structure.
+![Light Mode Workspace](docs/images/light_mode.png)
+
 ## ✨ Features
 
 | Feature | Description |

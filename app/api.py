@@ -2,12 +2,13 @@ import logging
 import os
 import time
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Set
 import asyncio
 import json
+import shutil
 
 from app.config import load_config
 from app.audio import AudioRecorder
@@ -61,6 +62,7 @@ learner = PreferenceLearner(db)
 class UpdateSessionRequest(BaseModel):
     transcript: Optional[str] = None
     summary: Optional[str] = None
+    label: Optional[str] = None
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -130,9 +132,9 @@ async def stop_recording(session_uuid: str, background_tasks: BackgroundTasks):
 async def process_session(session_uuid: str, audio_path: Path):
     """Background task for transcription, summarization, and DB storage."""
     try:
-        def on_progress(text: str):
+        def on_progress(text: str, percentage: int = 0):
             asyncio.run_coroutine_threadsafe(
-                manager.broadcast(json.dumps({"type": "transcript", "text": text, "uuid": session_uuid})),
+                manager.broadcast(json.dumps({"type": "transcript", "text": text, "percentage": percentage, "uuid": session_uuid})),
                 asyncio.get_event_loop()
             )
 
@@ -220,15 +222,29 @@ async def submit_feedback(session_uuid: str, req: UpdateSessionRequest):
         
     return {"status": "success", "preferences_learned": len(learned) if req.summary else 0}
 
-@app.post("/ingest/gas")
-async def ingest_gas():
+@app.post("/upload")
+async def upload_audio(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
+    """Upload an audio file for transcription and summarization."""
     try:
-        from scripts.ingest_benchmarks import ingest_all
-        count = ingest_all(db)
-        return {"status": "success", "count": count}
+        session_uuid = str(uuid.uuid4())
+        # Save uploaded file to local_storage
+        upload_dir = Path("local_storage") / session_uuid
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        audio_path = upload_dir / file.filename
+        with open(audio_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        
+        logger.info(f"Audio uploaded: {file.filename} -> {audio_path} ({audio_path.stat().st_size} bytes)")
+        
+        # Kick off transcription + summarization in background
+        background_tasks.add_task(process_session, session_uuid, audio_path)
+        
+        return {"status": "processing", "uuid": session_uuid, "filename": file.filename}
     except Exception as e:
-        logger.error(f"Failed to ingest GAS: {e}")
+        logger.error(f"Upload failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @app.post("/sessions/{session_uuid}/summarize")
 async def summarize_session(session_uuid: str):
@@ -251,6 +267,13 @@ async def summarize_session(session_uuid: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ── Adaptive Learning Endpoints ──────────────────────────────────
+
+@app.patch("/sessions/{session_uuid}/label")
+async def update_session_label(session_uuid: str, req: UpdateSessionRequest):
+    if req.label is None:
+        raise HTTPException(status_code=400, detail="Label is required")
+    db.update_session_label(session_uuid, req.label)
+    return {"status": "success", "label": req.label}
 
 @app.post("/sessions/{session_uuid}/approve")
 async def approve_session(session_uuid: str):

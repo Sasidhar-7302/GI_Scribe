@@ -61,7 +61,7 @@ def validate_full_pipeline():
     summarizer = TwoPassSummarizer(config.summarizer)
     
     # Specific files requested
-    target_files = ["GAS0001.mp3", "GAS0002.mp3", "GAS0003.mp3", "GAS0004.mp3", "GAS0005.mp3", "GAS0007.mp3"]
+    target_files = ["GAS0008.mp3", "GAS0009.mp3", "GAS0010.mp3"]
     
     results = []
     
@@ -156,7 +156,12 @@ def validate_full_pipeline():
         rwer = r.get("raw_wer")
         pwer = r.get("polished_wer")
         swar = r.get("wer_improvement", 0)
-        print(f"{cid}: Raw WER {rwer:.4f} -> Polished {pwer:.4f} (Change: {swar:+.4f})")
+        
+        rwer_str = f"{rwer:.4f}" if rwer is not None else "N/A"
+        pwer_str = f"{pwer:.4f}" if pwer is not None else "N/A"
+        swar_str = f"{swar:+.4f}" if swar else "N/A"
+        
+        print(f"{cid}: Raw WER {rwer_str} -> Polished {pwer_str} (Change: {swar_str})")
     print("="*40)
     
     with open(RESULTS_DIR / "full_pipeline_report.json", "w", encoding="utf-8") as f:

@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #000000;
+  --foreground: #FFFFFF;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  font-family: inherit;
+  margin: 0;
+}
+
+.glass-panel {
+  @apply bg-white/[0.02] backdrop-blur-2xl border border-white/[0.08] shadow-glass rounded-3xl;
+}
+
+.enterprise-btn {
+  @apply px-5 py-2.5 rounded-xl font-medium transition-all duration-300 active:scale-95 flex items-center justify-center gap-2;
+}
+
+.enterprise-btn-primary {
+  @apply enterprise-btn bg-white hover:bg-white/90 text-black shadow-lg shadow-white/10;
+}
+
+.enterprise-btn-secondary {
+  @apply enterprise-btn bg-white/[0.03] hover:bg-white/[0.08] text-white border border-white/[0.1];
+}
+
+.enterprise-input {
+  @apply bg-white/[0.03] border border-white/[0.08] rounded-xl px-5 py-3 text-white focus:outline-none focus:border-white/30 transition-all duration-300 placeholder-white/30;
+}
+
+/* Scrollbar customization */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-item {
+  @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer text-white/50 hover:text-white hover:bg-white/5 font-medium relative overflow-hidden;
+}
+
+.sidebar-item.active {
+  @apply text-white bg-white/10 shadow-sm border border-white/20;
+}
+
+.status-pill {
+  @apply inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-white/20;
+}
+
+/* Animations */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 15px rgba(239, 68, 68, 0);
+  }
+
+  100% {
+    transform: scale(0.8);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s infinite;
+}
+
+/* Light Mode Support */
+.theme-light {
+  filter: invert(1) hue-rotate(180deg);
+  background: white;
+}
+
+.theme-light img,
+.theme-light audio,
+.theme-light .text-emerald-400,
+.theme-light .text-red-400,
+.theme-light .bg-emerald-500,
+.theme-light .bg-red-500,
+.theme-light .bg-blue-500 {
+  filter: invert(1) hue-rotate(180deg); /* Re-invert colored branding elements so they stay exactly the original bright color */
+}

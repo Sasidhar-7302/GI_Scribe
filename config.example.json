@@ -6,13 +6,11 @@
     "silence_padding_ms": 300
   },
   "whisper": {
-    "binary_path": "external\\\\whisper.cpp\\\\build\\\\bin\\\\Release\\\\whisper-cli.exe",
-    "model_path": "models\\\\whisper\\\\ggml-small.en.bin",
-    "faster_model": "medium.en",
-    "engine": "cli",
-    "device": "auto",
-    "compute_type": "int8",
-    "beam_size": 5,
+    "engine": "faster",
+    "faster_model": "large-v3",
+    "device": "cuda",
+    "compute_type": "float16",
+    "beam_size": 10,
     "language": "en",
     "threads": 8,
     "temperature": 0.0,
@@ -24,11 +22,13 @@
   "summarizer": {
     "provider": "ollama",
     "base_url": "http://127.0.0.1:11434",
-    "model": "medllama2",
-    "fallback_model": "",
-    "temperature": 0.15,
-    "max_tokens": 500,
-    "prompt_style": "narrative"
+    "model": "llama3.1",
+    "fallback_model": "llama3.1",
+    "temperature": 0.0,
+    "max_tokens": 8000,
+    "prompt_style": "narrative",
+    "context_window": 8192,
+    "timeout_s": 600
   },
   "storage": {
     "root": "local_storage",

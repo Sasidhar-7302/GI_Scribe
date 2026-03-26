@@ -44,7 +44,38 @@ class GuidelineRAG:
         with open(self.data_path, 'r', encoding='utf-8') as f:
             self.guidelines = json.load(f)
             
-        self.logger.info(f"Loaded {len(self.guidelines)} guidelines.")
+        # Also load terminology to guarantee medical spelling corrections
+        terms_path = Path("data/gi_terms.txt")
+        if terms_path.exists():
+            try:
+                with open(terms_path, 'r', encoding='utf-8') as f:
+                    current_section = "General Clinical Terms"
+                    current_terms = []
+                    
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        if line.startswith("# ==="):
+                            if current_terms:
+                                self.guidelines.append({
+                                    "topic": f"Terminology: {current_section}",
+                                    "content": ", ".join(current_terms)
+                                })
+                            current_section = line.strip("# =").strip()
+                            current_terms = []
+                        elif not line.startswith("#"):
+                            current_terms.append(line)
+                            
+                    if current_terms:
+                        self.guidelines.append({
+                            "topic": f"Terminology: {current_section}",
+                            "content": ", ".join(current_terms)
+                        })
+            except Exception as e:
+                self.logger.error(f"Failed to load terms into RAG: {e}")
+            
+        self.logger.info(f"Loaded {len(self.guidelines)} RAG documents (guidelines + terminology).")
 
     def _initialize_model(self, model_name: str):
         # Check for cached embeddings first

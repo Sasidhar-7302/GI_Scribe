@@ -55,6 +55,11 @@ class DatabaseManager:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_feedback_session ON feedback(session_id)")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_pref_unique ON physician_preferences(physician_id, category, preference_key)")
+            # Migration: add label column if missing
+            try:
+                conn.execute("ALTER TABLE sessions ADD COLUMN label TEXT DEFAULT ''")
+            except sqlite3.OperationalError:
+                pass  # column already exists
             conn.commit()
 
     def add_session(self, uuid: str, audio_path: str, transcript: str, summary: str, metadata: Dict = None):
@@ -71,6 +76,11 @@ class DatabaseManager:
                 conn.execute("UPDATE sessions SET transcript = ? WHERE uuid = ?", (transcript, uuid))
             if summary is not None:
                 conn.execute("UPDATE sessions SET summary = ? WHERE uuid = ?", (summary, uuid))
+            conn.commit()
+
+    def update_session_label(self, uuid: str, label: str):
+        with self._get_connection() as conn:
+            conn.execute("UPDATE sessions SET label = ? WHERE uuid = ?", (label, uuid))
             conn.commit()
 
     def add_feedback(self, session_id: str, field: str, original: str, edited: str):

@@ -21,7 +21,7 @@ from .gi_terms import build_gi_hint
 from .gi_post_processor import process_transcription
 
 
-ProgressCallback = Optional[Callable[[str], None]]
+ProgressCallback = Optional[Callable[[str, int], None]]
 
 
 @dataclass
@@ -57,7 +57,10 @@ class WhisperTranscriber:
         try:
             from .diarizer import Diarizer
         except ImportError as e:
-            raise RuntimeError(f"GIEar (Diarizer) import failed: {e}")
+            self.logger.warning(f"GIEar (WhisperX) not installed, falling back to basic transcription. Error: {e}")
+            if self._engine == "faster":
+                return self._transcribe_faster(audio_path, progress_cb)
+            return self._transcribe_cli(audio_path)
 
         self.logger.info("Starting GIEar Diarization on %s", audio_path)
         start = time.perf_counter()
@@ -83,13 +86,14 @@ class WhisperTranscriber:
         
         # Format output
         formatted_lines = []
-        for seg in segments:
+        for i, seg in enumerate(segments):
             start_fmt = time.strftime('%H:%M:%S', time.gmtime(seg['start']))
             end_fmt = time.strftime('%H:%M:%S', time.gmtime(seg['end']))
             line = f"[{start_fmt} - {end_fmt}] {seg['speaker']}: {seg['text']}"
             formatted_lines.append(line)
             if progress_cb:
-                progress_cb(line)
+                pct = int((i + 1) / len(segments) * 100) if segments else 0
+                progress_cb("\n".join(formatted_lines), pct)
                 
         full_text = "\n".join(formatted_lines)
         runtime = time.perf_counter() - start
@@ -160,6 +164,9 @@ class WhisperTranscriber:
             if normalized_args:
                 cmd.extend(normalized_args)
             prompt_hint = build_gi_hint(max_terms=60)
+            physician_dict = getattr(self.config, "physician_dictionary", "")
+            if physician_dict:
+                prompt_hint = f"{physician_dict}, {prompt_hint}"
             if prompt_hint:
                 cmd.extend(["--prompt", prompt_hint])
             start = time.perf_counter()
@@ -217,19 +224,31 @@ class WhisperTranscriber:
             download_root=str(download_root),
             local_files_only=True,
         )
+        
+        # Hard override for local Large-v3 models lacking public hub tags
+        if "large-v3" in model_source.lower():
+            from faster_whisper.feature_extractor import FeatureExtractor
+            self._faster_model.feature_extractor = FeatureExtractor(feature_size=128)
+            
         return self._faster_model
 
     def _transcribe_faster(self, audio_path: Path, progress_cb: ProgressCallback) -> TranscriptionResult:
         model = self._ensure_faster_model()
         start = time.perf_counter()
         prompt_hint = build_gi_hint(max_terms=60)
+        physician_dict = getattr(self.config, "physician_dictionary", "")
+        if physician_dict:
+            prompt_hint = f"{physician_dict}, {prompt_hint}"
         segments_iter, info = model.transcribe(
             str(audio_path),
             language=self.config.language,
-            temperature=[0.0, 0.2, 0.4, 0.6] if self.config.temperature in (0.0, None) else self.config.temperature,
-            beam_size=self.config.beam_size or 5,
-            vad_filter=False,  # Disable VAD to avoid removing all audio
+            temperature=[0.0, 0.2, 0.4] if self.config.temperature in (0.0, None) else self.config.temperature,  # Stricter temperature fallback
+            beam_size=self.config.beam_size or 10, # Increased from 8 to 10 for even higher precision
+            repetition_penalty=1.2,                # Prevents stuttering in long dictations
+            vad_filter=True,                       # Enable VAD strongly so it ignores silence instead of hallucinating
+            vad_parameters=dict(min_silence_duration_ms=500), # Tuned VAD
             initial_prompt=prompt_hint or None,
+            condition_on_previous_text=False       # Prevents runaway hallucination loops across chunks
         )
         collected: List[str] = []
         for segment in segments_iter:
@@ -238,7 +257,9 @@ class WhisperTranscriber:
                 continue
             collected.append(text)
             if progress_cb:
-                progress_cb(" ".join(collected).strip())
+                pct = int((segment.end / info.duration) * 100) if getattr(info, 'duration', 0) else 0
+                pct = min(100, max(0, pct))
+                progress_cb(" ".join(collected).strip(), pct)
         runtime = time.perf_counter() - start
         full_text = " ".join(collected).strip()
         # Apply GI-specific post-processing for accuracy

@@ -46,10 +46,17 @@ class OllamaSummarizer:
         # as it is the 'Dragon-Level' standard we are pushing for.
         try:
             from .two_pass_summarizer import TwoPassSummarizer
+            from .acoustic_corrector import AcousticCorrector
+            
+            # Phase 10: Hyper-Accuracy Correction Pass
+            # Fix phonetic errors in the transcript using a zero-temp LLM pass
+            corrector = AcousticCorrector(self.config)
+            cleaned_transcript = corrector.correct(transcript)
+            
             tp_summarizer = TwoPassSummarizer(self.config)
             
-            # Using the advanced two-pass engine
-            result = tp_summarizer.summarize(transcript, style)
+            # Using the advanced two-pass engine with the corrected transcript
+            result = tp_summarizer.summarize(cleaned_transcript, style)
             
             # Format back to SummaryResult for UI compatibility
             # Format the structured summary to text
