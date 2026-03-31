@@ -27,7 +27,7 @@
       "min_speakers": 2,
       "max_speakers": 2
     },
-    "device_index": 1
+    "device_index": 0
   },
   "summarizer": {
     "provider": "ollama",

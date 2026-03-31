@@ -131,24 +131,38 @@ async def stop_recording(session_uuid: str, background_tasks: BackgroundTasks):
 
 async def process_session(session_uuid: str, audio_path: Path):
     """Background task for transcription, summarization, and DB storage."""
+    loop = asyncio.get_running_loop()
     try:
         def on_progress(text: str, percentage: int = 0):
             asyncio.run_coroutine_threadsafe(
                 manager.broadcast(json.dumps({"type": "transcript", "text": text, "percentage": percentage, "uuid": session_uuid})),
-                asyncio.get_event_loop()
+                loop
             )
 
         logger.info(f"Transcription starting for {session_uuid}")
-        result = transcriber.transcribe(audio_path, progress_cb=on_progress)
+        # Run synchronous transcription in a thread to avoid blocking the event loop
+        result = await asyncio.to_thread(
+            transcriber.transcribe, 
+            audio_path, 
+            progress_cb=on_progress
+        )
         
         logger.info("Summarization starting")
-        summary = summarizer.summarize(result.text)
+        await manager.broadcast(json.dumps({
+            "type": "status", 
+            "text": "Synthesizing Clinical Note...", 
+            "uuid": session_uuid
+        }))
+        
+        # Run synchronous summarization in a thread
+        summary_obj = await asyncio.to_thread(summarizer.summarize, result.text)
+        summary_text = summary_obj.summary if hasattr(summary_obj, "summary") else str(summary_obj)
         
         # Persist files
         artifacts = storage.persist(
             audio_file=audio_path,
             transcript=result.text,
-            summary=summary,
+            summary=summary_text,
             metadata={"uuid": session_uuid}
         )
         
@@ -157,16 +171,17 @@ async def process_session(session_uuid: str, audio_path: Path):
             uuid=session_uuid,
             audio_path=str(artifacts.audio_path),
             transcript=result.text,
-            summary=summary,
+            summary=summary_text,
             metadata={
                 "transcriber_runtime_s": result.runtime_s,
+                "summarizer_runtime_s": getattr(summary_obj, "runtime_s", 0) if hasattr(summary_obj, "runtime_s") else 0,
                 "whisper_command": result.command
             }
         )
         
         await manager.broadcast(json.dumps({
             "type": "summary", 
-            "text": summary,
+            "text": summary_text,
             "uuid": session_uuid
         }))
         logger.info(f"Session {session_uuid} complete and persisted.")
@@ -185,6 +200,21 @@ async def get_session(session_uuid: str):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+@app.delete("/sessions/{session_uuid}")
+async def delete_session(session_uuid: str):
+    session = db.get_session(session_uuid)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Optional: Delete files on disk
+    if session.get("audio_path"):
+        p = Path(session["audio_path"]).parent
+        if p.exists() and "local_storage" in str(p):
+            import shutil
+            shutil.rmtree(p, ignore_errors=True)
+
+    db.delete_session(session_uuid)
+    return {"status": "success"}
 
 @app.get("/sessions/{session_uuid}/audio")
 async def get_session_audio(session_uuid: str):
@@ -254,7 +284,8 @@ async def summarize_session(session_uuid: str):
         
     try:
         logger.info(f"Re-summarizing session {session_uuid}")
-        new_summary = summarizer.summarize(session["transcript"])
+        new_summary_obj = summarizer.summarize(session["transcript"])
+        new_summary = new_summary_obj.summary if hasattr(new_summary_obj, "summary") else str(new_summary_obj)
         db.update_session(session_uuid, summary=new_summary)
         
         # Update file too

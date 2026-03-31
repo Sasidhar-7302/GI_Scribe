@@ -1,5 +1,5 @@
-const API_URL = "http://127.0.0.1:8000";
-const WS_URL = "ws://127.0.0.1:8000/ws";
+const API_URL = "http://localhost:8000";
+const WS_URL = "ws://localhost:8000/ws";
 
 async function safeFetch(url: string, options?: RequestInit) {
     try {
@@ -57,6 +57,12 @@ export const api = {
         });
         if (!result) throw new Error("Failed to save label");
         return result;
+    },
+
+    async deleteSession(id: string) {
+        const data = await safeFetch(`${API_URL}/sessions/${id}`, { method: "DELETE" });
+        if (!data) throw new Error("Failed to delete session — backend offline.");
+        return data;
     },
 
     getAudioUrl(id: string) {

@@ -10,7 +10,9 @@ GI_HINTS = (
     "Terminology reminder: "
     + build_gi_hint()
     + ". Emphasize symptoms, disease activity, therapies, endoscopic findings, labs. "
-    "**NO-OMISSION POLICY**: Every note MUST include an HPI and an Assessment section. If data is sparse, state 'Ongoing evaluation' or 'Not documented' rather than omitting the section."
+    "**NO-OMISSION POLICY**: Every note MUST include an HPI and an Assessment section. For HPI and Assessment, if data is sparse, state 'Ongoing evaluation' or 'Not documented'. "
+    "**Omission Rule**: Omit optional sections (Findings, Plan, Medications/Orders, Follow-up) entirely if no pertinent information was discussed in the transcript. "
+    "**NO-REPETITION POLICY**: Do NOT copy the same clinical fact into multiple sections. Each piece of information should have one logical home."
 )
 
 # Few-shot examples for better context understanding

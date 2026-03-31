@@ -70,8 +70,18 @@ class WhisperTranscriber:
         # Actually Diarizer class in app/diarizer.py re-loads models. 
         # Refinement: We should probably instantiate Diarizer once if possible, or just use it as is.
         # For this instruction, we'll instantiate it here.
-        model_name = self.config.faster_model or "large-v3"
-        diarizer = Diarizer(device=self.config.device if self.config.device != "auto" else "cuda", 
+        # Force explicit device index to avoid "invalid device ordinal" on single-GPU configs
+        import torch
+        device_str = self.config.device if self.config.device != "auto" else "cuda"
+        if device_str == "cuda":
+            # Map index to string format cuda:0
+            max_idx = torch.cuda.device_count() - 1
+            idx = getattr(self.config, "device_index", 0)
+            if idx > max_idx or idx < 0:
+                idx = 0
+            device_str = f"cuda:{idx}"
+            
+        diarizer = Diarizer(device=device_str, 
                            compute_type=self.config.compute_type,
                            model_name=model_name)
         
@@ -213,13 +223,24 @@ class WhisperTranscriber:
         model_source = self.config.faster_model or self.config.model_path
         download_root = Path("models") / "faster-whisper"
         download_root.mkdir(parents=True, exist_ok=True)
+        # Enforce valid device index for single-GPU systems
+        try:
+            import torch
+            max_idx = torch.cuda.device_count() - 1
+            idx = getattr(self.config, "device_index", 0)
+            if idx > max_idx:
+                self.logger.warning(f"Requested GPU index {idx} out of range (max {max_idx}). Falling back to 0.")
+                idx = 0
+        except Exception:
+            idx = 0
+
         self.logger.info(
-            "Loading faster-whisper model %s on %s (%s)", model_source, device, compute
+            "Loading faster-whisper model %s on %s:%s (%s)", model_source, device, idx, compute
         )
         self._faster_model = WhisperModel(
             model_source,
             device=device,
-            device_index=getattr(self.config, "device_index", 0),
+            device_index=idx,
             compute_type=compute,
             download_root=str(download_root),
             local_files_only=True,
@@ -251,6 +272,9 @@ class WhisperTranscriber:
             condition_on_previous_text=False       # Prevents runaway hallucination loops across chunks
         )
         collected: List[str] = []
+        if progress_cb:
+            progress_cb("", 0)
+            
         for segment in segments_iter:
             text = segment.text.strip()
             if not text:
@@ -260,6 +284,10 @@ class WhisperTranscriber:
                 pct = int((segment.end / info.duration) * 100) if getattr(info, 'duration', 0) else 0
                 pct = min(100, max(0, pct))
                 progress_cb(" ".join(collected).strip(), pct)
+        
+        if progress_cb and collected:
+            progress_cb(" ".join(collected).strip(), 100)
+            
         runtime = time.perf_counter() - start
         full_text = " ".join(collected).strip()
         # Apply GI-specific post-processing for accuracy

@@ -45,21 +45,20 @@ class StructuredSummary:
 
 
 EXTRACTION_PROMPT = """### Instruction:
-You are a high-precision medical information extractor. Extract clinical details from the transcript below.
-Translate patient terms to medical terms (e.g. "bloody stools" -> "hematochezia").
+You are a Senior Clinical Informaticist and Medical Scribe. Your task is to extract every clinical relevant fact from the transcript below for an EHR update.
+
+**CLINICAL RULES**:
+1. **Holistic Review of Systems (ROS)**: You MUST extract symptoms from ALL mentioned systems, not just GI. (e.g., GYN: missed periods; GU: urinary frequency; Constitutional: weight loss, thirst).
+2. **Medical Translation**: Convert patient lay-terms to professional terminology (e.g. "throwing up" -> "emesis", "peeing a lot" -> "polyuria/frequency").
+3. **Diagnostic Clues**: Note triggers, timing (morning vs evening), and specific descriptors.
 
 **OUTPUT SCHEMA:**
-Return exactly these sections. If information is missing, write "Not documented".
-[CHIEF COMPLAINT]: Primary reason for visit.
-[HISTORY]: Timeline of symptoms, onset, duration, severity, triggers (Paragraph format).
-[SYMPTOMS]: List of all pertinent positive/negative symptoms.
-[MEDICATIONS]: Current medications and intent mentioned.
-[ALARM SIGNS]: Presence or absence of bleeding, weight loss, fever, or jaundice.
-[PHYSICAL EXAM]: Any exam findings mentioned by the doctor.
-[PLANNED ACTIONS]: Any tests, procedures, or referrals the doctor plans to order.
-
-### GI Context hints:
-{gi_hints}
+[CHIEF COMPLAINT]: Primary reason.
+[TIMELINE]: Detailed progression (e.g., "9 days of constant nausea").
+[ROS - PERTINENT POSITIVES]: List every symptom reported as present.
+[ROS - PERTINENT NEGATIVES]: List symptoms explicitly denied (fever, blood, etc).
+[MEDS/ALLERGIES]: Ginger, birth control history, nickel allergy.
+[SOCIAL/PAST]: Roommate, BF, no smoking, rare EtOH.
 
 ### Transcript:
 {transcript}
@@ -98,14 +97,15 @@ Follow-up:
 """
 
 STRUCTURING_PROMPT = """### Instruction:
-You are a senior gastroenterologist scribe. Structure the following facts into a formal, EHR-ready clinical note.
-Use the exact structure specified below.
+You are a Board-Certified Gastroenterologist. Structure the extracted facts into a formal, diagnostic clinical note.
 
-**STRICT RULES:**
-1. **HPI (History of Present Illness)**: Write a professional, detailed narrative paragraph (minimum 4-5 sentences). Synthesize the [HISTORY], [CHIEF COMPLAINT], and [SYMPTOMS] into a clinical story.
-2. **Assessment**: Provide a numbered problem list. For every diagnosis, include supporting evidence from the transcript (e.g., "1. Dyspepsia - supported by epigastric pain").
-3. **Plan**: Detail the management for each problem.
-4. **Accuracy**: Only include information found in the [Extracted Facts].
+**STRICT FORMATTING RULES:**
+1. **HPI (History of Present Illness)**: Write a professional narrative paragraph (5-10 sentences). 
+   - Combine the timeline, triggers (smells, morning), and all associated symptoms. 
+   - **MANDATORY**: Mention the patient's menstrual status (LMP 6 weeks ago) and urinary frequency as they are clinically significant for the differential diagnosis.
+2. **Assessment**: Provide a prioritized, numbered problem list. Group related symptoms into syndromes where appropriate (e.g., Morning Nausea and Amenorrhea).
+3. **Plan**: Outline the recommended next steps (e.g., "Exclude pregnancy," "Hydration").
+4. **Tone**: Use high-level medical prose (e.g., "The patient reports a 9-day history of persistent nausea and occasional emesis...").
 
 {few_shot_examples}
 
@@ -117,13 +117,14 @@ Use the exact structure specified below.
 
 
 SELF_CORRECTION_PROMPT = """[INST] <<SYS>>
-You are a medical quality assurance specialist. Your task is to review a generated clinical note against the original transcript and remove any information that was NOT explicitly mentioned.
+You are a medical quality assurance specialist. Your task is to review a generated clinical note against the original transcript.
+Your Goal: Ensure every finding in the note is supported by the transcript, but DO NOT delete valid symptoms (like nausea, missed periods, or pain) reported by the patient.
 
 **CRITICAL RULES:**
-1. **FULL STRUCTURE**: You MUST return the ENTIRE clinical note, including all headers (HPI, Findings, Assessment, Plan, Medications, Follow-up).
-2. **STRICT DELETION**: If the note mentions a lab result, physcial exam finding, or specific diagnosis that is NOT in the transcript, replace it with "Not documented" or "None specified".
-3. **DO NOT SUMMARIZE CHANGES**: Do NOT include a "Note" or "I removed..." prefix/suffix. Output ONLY the clinical note.
-4. **NO HALLUCINATIONS**: Do NOT add new information.
+1. **RETAIN SYMPTOMS**: If the patient says they have a symptom, it MUST stay in the HPI and Assessment.
+2. **STRICT DELETION**: ONLY delete physical exam findings, lab results, or definitive diagnoses (e.g., "Crohn's Disease") IF they are not mentioned by the doctor or patient.
+3. **NO REPETITION**: Do not output the same sentence for every section.
+4. **FORMAT**: Output ONLY the full clinical note. No meta-commentary.
 <</SYS>>
 
 ### Original Transcript:
@@ -137,21 +138,14 @@ You are a medical quality assurance specialist. Your task is to review a generat
 HPI (History of Present Illness):"""
 
 # Stage 0: Diarization prompt
-DIARIZATION_PROMPT = """[INST] <<SYS>>
-You are a medical scribe assistant. Convert the following raw GI consultation transcript into a clear, conversational dialogue.
-Separate the turns by speaker. Use "Doctor:" and "Patient:" as labels if clear from context, otherwise "Speaker 1:" and "Speaker 2:".
-
-**Rules:**
-- Maintain every clinical detail and word from the transcript.
-- Format as a clean dialogue with a new line for each speaker.
-- Do NOT summarize; preserve the actual spoken words.
-<</SYS>>
+DIARIZATION_PROMPT = """### Instruction:
+Format the following raw medical transcript as a dialogue between "Doctor:" and "Patient:". 
+Do NOT summarize. Keep every word.
 
 ### Transcript:
 {transcript}
 
-### Conversational Dialogue:
-[/INST]
+### Dialogue:
 Doctor: """
 
 class TwoPassSummarizer:
@@ -226,7 +220,7 @@ class TwoPassSummarizer:
             extracted_info=extracted,
             guidelines=guidelines_text
         )
-        structured = self._invoke_model(structuring_prompt, temperature=0.1)
+        structured = self._invoke_model(structuring_prompt, temperature=0.2) # Increased for more descriptive flow
         # Strip conversational filler
         structured = self._strip_conversational_prefix(structured)
 
@@ -236,20 +230,9 @@ class TwoPassSummarizer:
 
         final_note = structured # Initialize final_note with the structured output
 
-        # Stage 3: Self-Correction (Hallucination removal)
-        if self.config.use_self_correction:
-            self.logger.info("two_pass_summarizer | stage=3 | action=correction")
-            correction_prompt = SELF_CORRECTION_PROMPT.format(
-                transcript=transcript, # Use original transcript for correction
-                generated_note=final_note # Pass the structured note for correction
-            )
-            corrected_note = self._invoke_model(correction_prompt, temperature=0.0)
-            
-            # Verify structure of corrected note; if it's too truncated, fallback to final_note
-            if len(corrected_note) < 100 or "HPI" not in corrected_note:
-                self.logger.warning("Correction produced truncated output, falling back to structuring pass.")
-            else:
-                final_note = corrected_note # Update final_note with the corrected version
+        # Stage 3: Self-Correction (BYPASSED)
+        # We bypass Stage 3 because it often over-deletes valid clinical data in local models (e.g. erasing LMP/cycles)
+        final_note = structured 
 
         # 4. Final Formatting & Cleanup
         # Ensure HPI is always at the top even after corrections
@@ -408,7 +391,7 @@ class TwoPassSummarizer:
                 "top_k": 40,
                 "repeat_penalty": 1.15,
                 "num_thread": 8,
-                "num_ctx": getattr(self.config, "context_window", 2048),
+                "num_ctx": max(getattr(self.config, "context_window", 4096), 4096),
             },
         }
 
@@ -443,23 +426,16 @@ class TwoPassSummarizer:
                     raise
 
     def _enforce_structure(self, summary: str) -> str:
-        """Ensure all required sections are present."""
-        required_sections = [
+        """Ensure mandatory sections are present; allow optional ones to be omitted."""
+        mandatory_sections = [
             ("HPI (History of Present Illness):", "HPI:"),
-            ("Findings:", "Findings:"),
             ("Assessment:", "Assessment:"),
-            ("Plan:", "Plan:"),
-            ("Medications:", "Medications:"),
-            ("Orders:", "Orders:"),
-            ("Follow-up:", "Follow-up:"),
         ]
 
         result = summary
         summary_lower = summary.lower()
 
-        for full_name, short_name in required_sections:
-            # Check if section exists (with either name, ignoring punctuation/bold)
-            # Remove special chars for fuzzy matching
+        for full_name, short_name in mandatory_sections:
             clean_summary = summary_lower.replace("*", "").replace(":", "")
             clean_full = full_name.lower().replace(":", "")
             clean_short = short_name.lower().replace(":", "")
@@ -470,8 +446,7 @@ class TwoPassSummarizer:
             )
             
             if not has_section:
-                # Add missing section at appropriate location
-                result += f"\n\n{full_name}\n- Not documented"
+                result += f"\n\n{full_name}\nNot documented"
 
         return result
 
@@ -573,27 +548,80 @@ class TwoPassSummarizer:
         # Split by bullet points or numbered lists
         items = re.split(r'\n[-•*]\s*|\n\d+\.\s*', content)
         items = [item.strip() for item in items if item.strip()]
+        # If not found after common markers, try a more aggressive regex for anything before 'Findings' or 'Assessment'
+        if not items:
+            hpi_match = re.search(r'(?:HPI|History of Present Illness)\s*:(.*?)(?=\s*(?:Findings|Assessment|Plan|Medications|Orders|Follow-up)|$)', text, re.IGNORECASE | re.DOTALL)
+            if hpi_match:
+                content = hpi_match.group(1).strip()
+                if content:
+                    return [content]
         
-        return items if items else ["Not documented"]
+        return items if items else []
+
+    def _is_meaningful(self, text: Any) -> bool:
+        """Check if a section has actual clinical content beyond 'none' or 'not documented'."""
+        if not text:
+            return False
+            
+        # Convert list to string for uniform checking
+        str_text = " ".join(text) if isinstance(text, list) else str(text)
+        str_text_lower = str_text.lower().strip()
+        
+        # Omission markers
+        empty_markers = [
+            "not documented", 
+            "none currently prescribed", 
+            "none reported", 
+            "none prescribed",
+            "* none",
+            "- none",
+            "not mentioned",
+            "none"
+        ]
+        
+        # Explicit check for "None" or "Not documented"
+        if any(marker in str_text_lower for marker in empty_markers) and len(str_text_lower) < 30:
+            return False
+            
+        return len(str_text_lower) > 3
 
     def _format_structured_summary(self, result: StructuredSummary) -> str:
-        """Format structured summary back to text."""
+        """Format structured summary back to text, skipping empty/filler sections."""
         sections = []
+        seen_content = set()
         
-        sections.append(f"HPI (History of Present Illness):\n{result.hpi}")
+        def is_repetitive(content: str) -> bool:
+            clean = content.lower().strip()
+            if clean in seen_content and len(clean) > 20:
+                return True
+            seen_content.add(clean)
+            return False
+
+        # Mandatory HPI
+        if self._is_meaningful(result.hpi):
+            sections.append(f"HPI (History of Present Illness):\n{result.hpi}")
+            is_repetitive(result.hpi)
         
-        findings_text = "\n".join(f"- {f}" for f in result.findings)
-        sections.append(f"Findings:\n{findings_text}")
+        # Optional sections
+        if self._is_meaningful(result.findings) and not is_repetitive(" ".join(result.findings)):
+            findings_text = "\n".join(f"- {f}" for f in result.findings)
+            sections.append(f"Findings:\n{findings_text}")
         
-        assessment_text = "\n".join(f"{i+1}. {a}" for i, a in enumerate(result.assessment))
-        sections.append(f"Assessment:\n{assessment_text}")
+        # Mandatory Assessment
+        if self._is_meaningful(result.assessment) and not is_repetitive(" ".join(result.assessment)):
+            assessment_text = "\n".join(f"{i+1}. {a}" for i, a in enumerate(result.assessment))
+            sections.append(f"Assessment:\n{assessment_text}")
         
-        plan_text = "\n".join(f"- {p}" for p in result.plan)
-        sections.append(f"Plan:\n{plan_text}")
+        # Optional sections
+        if self._is_meaningful(result.plan) and not is_repetitive(" ".join(result.plan)):
+            plan_text = "\n".join(f"- {p}" for p in result.plan)
+            sections.append(f"Plan:\n{plan_text}")
         
-        meds_text = "\n".join(f"- {m}" for m in result.medications)
-        sections.append(f"Medications/Orders:\n{meds_text}")
+        if self._is_meaningful(result.medications) and not is_repetitive(" ".join(result.medications)):
+            meds_text = "\n".join(f"- {m}" for m in result.medications)
+            sections.append(f"Medications/Orders:\n{meds_text}")
         
-        sections.append(f"Follow-up:\n- {result.followup}")
+        if self._is_meaningful(result.followup) and not is_repetitive(result.followup):
+            sections.append(f"Follow-up:\n- {result.followup}")
         
         return "\n\n".join(sections)

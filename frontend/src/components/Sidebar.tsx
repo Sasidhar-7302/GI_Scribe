@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { LayoutDashboard, Library, User, Zap, History, Edit2, Check, X, Search } from "lucide-react";
+import { LayoutDashboard, Library, User, Zap, History, Edit2, Check, X, Search, Trash2 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { api } from "@/lib/api";
@@ -46,6 +46,7 @@ interface SidebarProps {
 export const Sidebar = ({ activeTab, onTabChange, sessions, activeSessionId, onSelectSession, onRefreshSessions }: SidebarProps) => {
     const [backendOnline, setBackendOnline] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
 
@@ -63,9 +64,19 @@ export const Sidebar = ({ activeTab, onTabChange, sessions, activeSessionId, onS
             await api.updateSessionLabel(id, editValue.trim());
             onRefreshSessions();
         } catch {
-            // silent fail for now, maybe add toast later
+            // silent fail
         }
         setEditingId(null);
+    };
+
+    const handleDeleteSession = async (id: string) => {
+        try {
+            await api.deleteSession(id);
+            onRefreshSessions();
+            setConfirmDeleteId(null);
+        } catch {
+            // silent fail
+        }
     };
 
     useEffect(() => {
@@ -125,9 +136,9 @@ export const Sidebar = ({ activeTab, onTabChange, sessions, activeSessionId, onS
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 pr-1">
-                    {filteredSessions.length > 0 ? filteredSessions.map((s) => (
+                    {filteredSessions.length > 0 ? filteredSessions.map((s, idx) => (
                         <div
-                            key={s.uuid}
+                            key={s.uuid || `session-${idx}`}
                             onClick={() => { if (editingId !== s.uuid) onSelectSession(s.uuid); }}
                             onDoubleClick={() => { setEditingId(s.uuid); setEditValue(s.label || ""); }}
                             className={`group px-3 py-2 rounded-lg cursor-pointer transition-all ${activeSessionId === s.uuid
@@ -163,6 +174,15 @@ export const Sidebar = ({ activeTab, onTabChange, sessions, activeSessionId, onS
                                             className="opacity-0 group-hover/item:opacity-100 p-0.5 text-white/30 hover:text-white/80 transition-opacity"
                                         >
                                             <Edit2 size={10} />
+                                        </button>
+                                        <button 
+                                            onClick={(e) => { 
+                                                e.stopPropagation(); 
+                                                setConfirmDeleteId(s.uuid);
+                                            }}
+                                            className="opacity-0 group-hover/item:opacity-100 p-0.5 text-red-400/50 hover:text-red-400 transition-opacity"
+                                        >
+                                            <Trash2 size={10} />
                                         </button>
                                         <span className="text-[9px] text-white/20 shrink-0">
                                             {new Date(s.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
@@ -209,6 +229,34 @@ export const Sidebar = ({ activeTab, onTabChange, sessions, activeSessionId, onS
                     <p className="text-[8px] text-white/30 mt-1 uppercase tracking-widest">Chief Gastro</p>
                 </div>
             </div>
+            {/* Custom Delete Confirmation Modal */}
+            {confirmDeleteId && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-[#111] border border-white/10 p-6 rounded-2xl max-w-sm w-full shadow-2xl animate-in zoom-in duration-200">
+                        <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+                            <Trash2 className="text-red-400" size={24} />
+                        </div>
+                        <h4 className="text-white font-bold text-lg mb-2">Delete Session?</h4>
+                        <p className="text-white/50 text-xs leading-relaxed mb-6">
+                            This will permanently remove all audio, transcripts, and clinical notes associated with this session. This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 text-xs font-semibold transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={() => handleDeleteSession(confirmDeleteId)}
+                                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-all shadow-[0_4px_12px_rgba(239,68,68,0.2)]"
+                            >
+                                Delete Forever
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </aside>
     );
 };

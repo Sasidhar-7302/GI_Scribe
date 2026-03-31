@@ -42,7 +42,7 @@ export const Dashboard = ({ initialSessionId, onSessionLoaded, onSessionsChange,
     const wsRef = useRef<WebSocket | null>(null);
 
     interface WSMessage {
-        type: "transcript" | "summary" | "error";
+        type: "transcript" | "summary" | "error" | "status";
         text?: string;
         uuid?: string;
         detail?: string;
@@ -73,15 +73,22 @@ export const Dashboard = ({ initialSessionId, onSessionLoaded, onSessionsChange,
         loadSessions();
         wsRef.current = api.connectWS((rawData: unknown) => {
             const data = rawData as WSMessage & { percentage?: number };
-            if (data.type === "transcript" && data.text) {
-                setTranscript(data.text);
+            if (data.type === "transcript") {
+                if (data.text !== undefined) setTranscript(data.text);
                 setStatus(data.percentage !== undefined ? `Transcribing... ${data.percentage}%` : "Transcribing...");
             } else if (data.type === "summary" && data.text && data.uuid) {
                 setSummary(data.text);
                 setStatus("Complete");
                 onActiveSessionChange(data.uuid);
                 setIsProcessing(false);
+                setIsRecording(false);
+                if (timerRef.current) {
+                    clearInterval(timerRef.current);
+                    timerRef.current = null;
+                }
                 loadSessions();
+            } else if (data.type === "status" && data.text) {
+                setStatus(data.text);
             } else if (data.type === "error" && data.detail) {
                 setError(data.detail);
                 setIsProcessing(false);
@@ -302,7 +309,7 @@ export const Dashboard = ({ initialSessionId, onSessionLoaded, onSessionsChange,
                 {/* Toasts */}
                 <AnimatePresence mode="wait">
                     {error && (
-                        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        <motion.div key="error-toast" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                             className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center gap-2 text-xs shrink-0"
                         >
                             <AlertCircle size={14} />
@@ -311,7 +318,7 @@ export const Dashboard = ({ initialSessionId, onSessionLoaded, onSessionsChange,
                         </motion.div>
                     )}
                     {success && (
-                        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        <motion.div key="success-toast" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                             className="px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-2 text-xs shrink-0"
                         >
                             <CheckCircle2 size={14} />
@@ -362,7 +369,7 @@ export const Dashboard = ({ initialSessionId, onSessionLoaded, onSessionsChange,
                                     {!isEmpty && (
                                         <>
                                             <motion.div layout className={`font-mono text-xs tabular-nums px-2.5 py-1 rounded-md ${isRecording ? "text-red-400 bg-red-500/10" : "text-white/25 bg-white/[0.02]"}`}>
-                                                {formatTimer(isRecording ? recordingSeconds : 0)}
+                                                {formatTimer(recordingSeconds)}
                                             </motion.div>
                                             <motion.span layout className={`text-[10px] font-medium flex items-center gap-1.5 ${isProcessing || isRecording ? "text-white/70" : "text-white/30"}`}>
                                                 {isProcessing && <span className="w-2.5 h-2.5 rounded-full border-2 border-white/20 border-t-white animate-spin" />}
@@ -449,13 +456,11 @@ export const Dashboard = ({ initialSessionId, onSessionLoaded, onSessionsChange,
                                         <Copy size={12} />
                                     </button>
                                     <div className="w-px h-4 bg-white/10 mx-0.5" />
-                                    <button onClick={handleExportEHR} disabled={!summary}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-semibold transition-all ${summary
-                                            ? "bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/30"
-                                            : "bg-white/5 text-white/20 cursor-not-allowed border border-transparent"
-                                        }`} title="Copy formatted text to EHR">
-                                        <Send size={10} />
-                                        Export EHR
+                                    <button disabled
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-semibold bg-white/5 text-white/20 cursor-not-allowed border border-transparent"
+                                        title="Direct EHR integration is coming soon">
+                                        <div className="w-1 h-1 rounded-full bg-indigo-400 animate-pulse" />
+                                        EHR Export (Soon)
                                     </button>
                                     <button onClick={handleApproveAndLearn} disabled={!activeSessionId}
                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-semibold transition-all ${activeSessionId

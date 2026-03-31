@@ -104,6 +104,12 @@ class DatabaseManager:
             row = cursor.fetchone()
             return dict(row) if row else None
 
+    def delete_session(self, uuid: str):
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM feedback WHERE session_id = ?", (uuid,))
+            conn.execute("DELETE FROM sessions WHERE uuid = ?", (uuid,))
+            conn.commit()
+
     # ── Physician Preference Learning ────────────────────────────────
 
     def upsert_preference(self, category: str, key: str, value: str,

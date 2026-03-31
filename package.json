@@ -1,0 +1,10 @@
+{
+  "name": "gi-scribe-root",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "powershell -ExecutionPolicy Bypass -File scripts\\clean_ports.ps1 && start \"GI Scribe Backend\" cmd /k \"echo Starting Backend... && .\\\\.venv\\\\Scripts\\\\python -m uvicorn app.api:app --host 0.0.0.0 --port 8000\" && npm run dev --prefix frontend",
+    "clean": "powershell -ExecutionPolicy Bypass -File scripts\\clean_ports.ps1",
+    "backend": ".\\\\.venv\\\\Scripts\\\\python -m uvicorn app.api:app --host 0.0.0.0 --port 8000",
+    "frontend": "npm run dev --prefix frontend"
+  }
+}

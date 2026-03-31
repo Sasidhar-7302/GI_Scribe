@@ -13,6 +13,14 @@ class Diarizer:
         self.diarize_model = None
         self.model_name = model_name
         print(f"Initializing Diarizer on {self.device} with {self.compute_type}...")
+        
+    def _get_device_index(self):
+        if ":" in self.device:
+            try:
+                return int(self.device.split(":")[1])
+            except:
+                return 0
+        return 0
 
     def load_resources(self):
         """Loads models if they aren't already loaded to save VRAM when not in use."""
@@ -21,7 +29,8 @@ class Diarizer:
             self.model = whisperx.load_model(
                 self.model_name, 
                 self.device, 
-                compute_type=self.compute_type
+                compute_type=self.compute_type,
+                device_index=self._get_device_index()
             )
         
     def process_audio(self, audio_file, num_speakers=None, min_speakers=None, max_speakers=None, initial_prompt=None):
