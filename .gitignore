@@ -68,11 +68,18 @@ tmp/
 temp/
 tmp_extract/
 unsloth_compiled_cache/
-debug_output.txt
+*.txt
+!requirements.txt
+!data/gi_terms.txt
+!CONTRIBUTING.md
+!ARCHITECTURE.md
+*.log
 results.txt
 verify90_output.txt
-test_results.txt
-test_results_base.txt
 
 # Gemini agent files
 .gemini/
+brain/
+walkthrough.md
+task.md
+implementation_plan.md

@@ -30,10 +30,10 @@ GI Scribe is a **local-first, privacy-preserving** clinical documentation assist
 | Feature | Description |
 |---------|-------------|
 | **🎙️ Live Dictation** | Record directly from your microphone with real-time transcription |
-| **📋 Clinical Notes** | Auto-generated HPI, Assessment, Plan, Medications, and Follow-up sections |
-| **🧠 Self-Learning** | Adapts to your writing style from corrections — progressively better notes |
-| **🔒 100% Offline** | No cloud, no telemetry, no data leaves your machine |
-| **⚡ GPU-Accelerated** | Optimized for NVIDIA GPUs with BFloat16/Float16 precision |
+| **📋 Clinical Notes** | High-fidelity HPI & Assessment with Syndromic Synthesis |
+| **🧠 Self-Learning** | Adapts to physician style from approved corrections |
+| **🔒 100% Offline** | ZERO-Cloud, HIPAA-safe local inferencing |
+| **⚡ Stabilized Dev** | PowerShell-protected startup prevents port collisions |
 
 ## 🏗️ Architecture
 
@@ -112,21 +112,17 @@ npm install
 
 ### 5. Run
 
-**Option A — Development (two terminals):**
-
+**The "One Command" Launch (Recommended):**
+Open your terminal in the root folder and run:
 ```bash
-# Terminal 1: Backend
-uvicorn app.api:app --host 127.0.0.1 --port 8000
-
-# Terminal 2: Frontend
-cd frontend && npm run dev
+npm run dev
 ```
+*This will automatically clean ports 3000/8000, start the FastAPI Backend, and launch the Next.js Frontend.*
 
-**Option B — Unified launcher:**
-
-```bash
-python main_web.py
-```
+**Manual Launch (Two Terminals):**
+If you need isolated logs:
+- **Backend**: `uvicorn app.api:app --host 127.0.0.1 --port 8000`
+- **Frontend**: `cd frontend && npm run dev`
 
 Open **http://localhost:3000** in your browser.
 
